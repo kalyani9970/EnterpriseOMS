@@ -1,0 +1,46 @@
+@if (user(); as current) {
+  <section>
+    <h1 class="text-2xl font-semibold text-slate-900">Welcome, {{ current.fullName }}</h1>
+    <p class="mt-1 text-sm text-slate-500">Here is what your account can do.</p>
+
+    <dl class="mt-6 grid gap-4 sm:grid-cols-3">
+      <div class="rounded-xl bg-white p-5 ring-1 ring-slate-200">
+        <dt class="text-xs font-medium tracking-wide text-slate-500 uppercase">Role</dt>
+        <dd class="mt-1 text-lg font-semibold text-slate-900">{{ current.role }}</dd>
+      </div>
+      <div class="rounded-xl bg-white p-5 ring-1 ring-slate-200">
+        <dt class="text-xs font-medium tracking-wide text-slate-500 uppercase">Email</dt>
+        <dd class="mt-1 truncate text-lg font-semibold text-slate-900">{{ current.email }}</dd>
+      </div>
+      <div class="rounded-xl bg-white p-5 ring-1 ring-slate-200">
+        <dt class="text-xs font-medium tracking-wide text-slate-500 uppercase">Organization</dt>
+        <dd class="mt-1 text-lg font-semibold text-slate-900">#{{ current.organizationId }}</dd>
+      </div>
+    </dl>
+
+    <div class="mt-8 rounded-xl bg-white p-6 ring-1 ring-slate-200">
+      <h2 class="text-base font-semibold text-slate-900">Your permissions</h2>
+
+      @if (permissionGroups().length === 0) {
+        <p class="mt-2 text-sm text-slate-500">
+          Your role has no permissions yet. An administrator can grant access as modules are enabled.
+        </p>
+      } @else {
+        <div class="mt-4 space-y-4">
+          @for (group of permissionGroups(); track group.module) {
+            <div>
+              <h3 class="text-xs font-medium tracking-wide text-slate-500 uppercase">{{ group.module }}</h3>
+              <ul class="mt-2 flex flex-wrap gap-2">
+                @for (permission of group.items; track permission) {
+                  <li class="rounded-full bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700">
+                    {{ permission }}
+                  </li>
+                }
+              </ul>
+            </div>
+          }
+        </div>
+      }
+    </div>
+  </section>
+}
