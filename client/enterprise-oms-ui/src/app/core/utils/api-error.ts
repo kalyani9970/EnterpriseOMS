@@ -70,11 +70,20 @@ export function parseApiError(error: unknown): ApiError {
   }
 }
 
+/**
+ * The API names fields the .NET way ("Email", "Address.CountryCode"). The client uses camelCase
+ * ("email", "address.countryCode"), so every dot-separated part gets a lower-case first letter.
+ */
 function camelCaseKeys(errors: Record<string, string[]> | undefined): Record<string, string[]> {
   const result: Record<string, string[]> = {};
 
   for (const [key, messages] of Object.entries(errors ?? {})) {
-    result[key.charAt(0).toLowerCase() + key.slice(1)] = messages;
+    const camelKey = key
+      .split('.')
+      .map((part) => part.charAt(0).toLowerCase() + part.slice(1))
+      .join('.');
+
+    result[camelKey] = messages;
   }
 
   return result;

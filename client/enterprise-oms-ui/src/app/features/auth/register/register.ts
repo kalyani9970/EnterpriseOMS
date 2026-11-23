@@ -19,12 +19,16 @@ export class Register {
 
   protected readonly form = this.formBuilder.group(
     {
+      // Signing up creates a brand-new organization, so its name is part of the form.
+      // pattern(/\S/) rejects a name made only of spaces, which Validators.required would accept.
+      organizationName: [
+        '',
+        [Validators.required, Validators.pattern(/\S/), Validators.minLength(2), Validators.maxLength(200)],
+      ],
       fullName: ['', [Validators.required, Validators.maxLength(200)]],
       email: ['', [Validators.required, Validators.email, Validators.maxLength(256)]],
       password: ['', [Validators.required, strongPassword]],
       confirmPassword: ['', [Validators.required]],
-      // Temporary: the Organization module will replace this field with an invite or a picker.
-      organizationId: [1, [Validators.required, Validators.min(1)]],
     },
     { validators: passwordsMatch },
   );
@@ -53,9 +57,9 @@ export class Register {
     this.errorMessage.set(null);
     this.serverErrors.set({});
 
-    const { fullName, email, password, organizationId } = this.form.getRawValue();
+    const { organizationName, fullName, email, password } = this.form.getRawValue();
 
-    this.auth.register({ fullName, email, password, organizationId }).subscribe({
+    this.auth.register({ organizationName: organizationName.trim(), fullName, email, password }).subscribe({
       next: () => {
         this.submitting.set(false);
         void this.router.navigateByUrl('/');

@@ -23,7 +23,7 @@ public class AuthController : ControllerBase
         _sender = sender;
     }
 
-    /// <summary>Creates a new account with the baseline Employee role.</summary>
+    /// <summary>Creates a new organization and its first user, who becomes the organization's Admin.</summary>
     [HttpPost("register")]
     [AllowAnonymous]
     [ProducesResponseType(typeof(AuthResultDto), StatusCodes.Status200OK)]
@@ -37,8 +37,7 @@ public class AuthController : ControllerBase
             FullName = request.FullName,
             Email = request.Email,
             Password = request.Password,
-            OrganizationId = request.OrganizationId,
-            RoleId = null   // never client-controlled
+            OrganizationName = request.OrganizationName
         };
 
         return Ok(await _sender.Send(command, cancellationToken));

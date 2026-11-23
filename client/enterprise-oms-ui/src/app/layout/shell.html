@@ -21,6 +21,36 @@
             Home
           </a>
 
+          @if (auth.hasPermission(permissions.Products.View)) {
+            <a
+              routerLink="/products"
+              routerLinkActive="bg-slate-100 text-slate-900"
+              class="rounded-md px-3 py-2 text-slate-600 hover:bg-slate-50"
+            >
+              Products
+            </a>
+          }
+
+          @if (auth.hasPermission(permissions.Warehouses.View)) {
+            <a
+              routerLink="/warehouses"
+              routerLinkActive="bg-slate-100 text-slate-900"
+              class="rounded-md px-3 py-2 text-slate-600 hover:bg-slate-50"
+            >
+              Warehouses
+            </a>
+          }
+
+          @if (auth.hasPermission(permissions.Organizations.View)) {
+            <a
+              routerLink="/organization"
+              routerLinkActive="bg-slate-100 text-slate-900"
+              class="rounded-md px-3 py-2 text-slate-600 hover:bg-slate-50"
+            >
+              Organization
+            </a>
+          }
+
           @if (auth.hasPermission(permissions.Roles.View)) {
             <a
               routerLink="/roles"

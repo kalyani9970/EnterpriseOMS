@@ -8,7 +8,7 @@ namespace EnterpriseOMS.Application.Common.Behaviors;
 /// has a registered FluentValidation validator. If validation fails, it throws OUR
 /// ValidationException (EnterpriseOMS.Application.Common.Exceptions), which the API's
 /// ExceptionHandlingMiddleware maps to HTTP 400. Handlers never validate manually.
-
+///
 /// .NET concept: both FluentValidation and our Application layer define a type called
 /// ValidationException. Because "using FluentValidation;" is imported here, the bare name
 /// would bind to FluentValidation's type, so we qualify ours through "Exceptions.".
@@ -30,7 +30,7 @@ public class ValidationBehavior<TRequest, TResponse> : IPipelineBehavior<TReques
     {
         if (!_validators.Any())
         {
-            return await next();
+            return await next(cancellationToken);
         }
 
         var context = new ValidationContext<TRequest>(request);
@@ -48,6 +48,6 @@ public class ValidationBehavior<TRequest, TResponse> : IPipelineBehavior<TReques
             throw new Exceptions.ValidationException(failures);
         }
 
-        return await next();
+        return await next(cancellationToken);
     }
 }

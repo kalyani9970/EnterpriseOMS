@@ -35,21 +35,26 @@ namespace EnterpriseOMS.Application.Modules.Auth.Commands.Login
         {
             var normalizedEmail = request.Email.Trim().ToUpperInvariant();
 
+            // IgnoreQueryFilters: at login we do not yet know which organization the user belongs to.
+            // That is the one moment tenant filtering cannot apply. Every later request is filtered.
             var user = await _context.Users
+                .IgnoreQueryFilters()
+                .Include(u => u.Organization)
                 .Include(u => u.Role)
                     .ThenInclude(r => r.RolePermissions)
                         .ThenInclude(rp => rp.Permission)
                 .FirstOrDefaultAsync(u => u.NormalizedEmail == normalizedEmail, cancellationToken);
 
             // Deliberately identical error for "no such user" and "wrong password"
-            // — prevents user-enumeration attacks via error-message differences.
+            // to prevent user-enumeration through error-message differences.
             if (user is null || !_passwordHasher.Verify(user.PasswordHash, request.Password))
             {
                 throw new ValidationException(
                     new[] { new FluentValidation.Results.ValidationFailure("Email", "Invalid email or password.") });
             }
 
-            if (!user.IsActive)
+            // Checked only AFTER the password is verified, so these states are not revealed to strangers.
+            if (!user.IsActive || !user.Organization.IsActive)
             {
                 throw new ForbiddenAccessException();
             }

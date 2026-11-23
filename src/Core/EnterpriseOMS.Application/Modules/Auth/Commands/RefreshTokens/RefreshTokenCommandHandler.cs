@@ -13,6 +13,13 @@ using System.Threading.Tasks;
 
 namespace EnterpriseOMS.Application.Modules.Auth.Commands.RefreshTokens
 {
+    /// <summary>
+    /// Implements refresh-token ROTATION: every use of a refresh token issues a brand new one and
+    /// revokes the old, linking them via ReplacedByToken. This lets us detect token theft: if a
+    /// revoked token is ever reused, we know it was stolen (a real client would not reuse it) and
+    /// can revoke the entire chain.
+    /// Like login, this runs before the caller's organization is known, so it ignores tenant filters.
+    /// </summary>
     public class RefreshTokenCommandHandler : IRequestHandler<RefreshTokenCommand, AuthResultDto>
     {
         private readonly IApplicationDbContext _context;
@@ -32,6 +39,9 @@ namespace EnterpriseOMS.Application.Modules.Auth.Commands.RefreshTokens
         public async Task<AuthResultDto> Handle(RefreshTokenCommand request, CancellationToken cancellationToken)
         {
             var existingToken = await _context.RefreshTokens
+                .IgnoreQueryFilters()
+                .Include(rt => rt.User)
+                    .ThenInclude(u => u.Organization)
                 .Include(rt => rt.User)
                     .ThenInclude(u => u.Role)
                         .ThenInclude(r => r.RolePermissions)
@@ -43,8 +53,9 @@ namespace EnterpriseOMS.Application.Modules.Auth.Commands.RefreshTokens
 
             if (existingToken.RevokedAt is not null)
             {
-                // Token reuse detected — revoke all active tokens for this user as a precaution.
+                // Token reuse detected: revoke all active tokens for this user as a precaution.
                 var userTokens = await _context.RefreshTokens
+                    .IgnoreQueryFilters()
                     .Where(rt => rt.UserId == existingToken.UserId && rt.RevokedAt == null)
                     .ToListAsync(cancellationToken);
 
@@ -57,19 +68,22 @@ namespace EnterpriseOMS.Application.Modules.Auth.Commands.RefreshTokens
             if (!existingToken.IsActive)
                 throw new ForbiddenAccessException();
 
+            // A deactivated user or organization must not be able to keep a session alive.
+            if (!existingToken.User.IsActive || !existingToken.User.Organization.IsActive)
+                throw new ForbiddenAccessException();
+
             var newRefreshTokenValue = _jwtTokenService.GenerateRefreshToken();
 
             existingToken.RevokedAt = _dateTime.UtcNow;
             existingToken.ReplacedByToken = newRefreshTokenValue;
 
-            var newRefreshToken = new RefreshToken
+            _context.RefreshTokens.Add(new RefreshToken
             {
                 UserId = existingToken.UserId,
                 Token = newRefreshTokenValue,
                 CreatedAt = _dateTime.UtcNow,
                 ExpiresAt = _dateTime.UtcNow.AddDays(7)
-            };
-            _context.RefreshTokens.Add(newRefreshToken);
+            });
 
             var permissions = existingToken.User.Role.RolePermissions
                 .Select(rp => rp.Permission.Code)

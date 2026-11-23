@@ -1,0 +1,267 @@
+<section class="mx-auto max-w-3xl">
+  <a routerLink="/warehouses" class="text-sm text-slate-500 hover:text-slate-700">← Back to warehouses</a>
+
+  <div class="mt-3 flex items-start justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-semibold text-slate-900">{{ isEdit() ? 'Edit warehouse' : 'New warehouse' }}</h1>
+      @if (warehouse(); as current) {
+        <p class="mt-1 font-mono text-xs text-slate-500">{{ current.code }}</p>
+      }
+    </div>
+
+    @if (warehouse(); as current) {
+      @if (current.isActive) {
+        <span class="rounded-full bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700">Active</span>
+      } @else {
+        <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">Inactive</span>
+      }
+    }
+  </div>
+
+  @if (loadStatus() === 'loading') {
+    <p class="mt-6 text-sm text-slate-500" role="status">Loading warehouse…</p>
+  } @else if (loadStatus() === 'notFound') {
+    <div role="alert" class="mt-6 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-200">
+      That warehouse could not be found. It may have been removed, or it belongs to another organization.
+    </div>
+  } @else if (loadStatus() === 'error') {
+    <div role="alert" class="mt-6 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-200">
+      <p>{{ errorMessage() }}</p>
+      <button type="button" (click)="load()" class="mt-2 font-medium underline">Try again</button>
+    </div>
+  } @else {
+    @if (conflict()) {
+      <div role="alert" class="mt-6 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800 ring-1 ring-amber-200">
+        <p class="font-medium">Someone else changed this warehouse while you were editing.</p>
+        <p class="mt-1">Your changes were not saved. Load the latest version, then apply your edits again.</p>
+        <button type="button" (click)="reloadLatest()" class="mt-2 font-medium underline">Load the latest version</button>
+      </div>
+    } @else if (errorMessage(); as message) {
+      <div role="alert" class="mt-6 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-200">
+        {{ message }}
+      </div>
+    }
+
+    @if (saved()) {
+      <p role="status" class="mt-6 text-sm font-medium text-green-700">Saved.</p>
+    }
+
+    <form [formGroup]="form" (ngSubmit)="save()" novalidate class="mt-6 space-y-6 rounded-xl bg-white p-6 ring-1 ring-slate-200">
+      <div class="grid gap-5 sm:grid-cols-2">
+        <div>
+          <label for="code" class="block text-sm font-medium text-slate-700">Code</label>
+          <input
+            id="code"
+            type="text"
+            formControlName="code"
+            autocomplete="off"
+            class="mt-1 block w-full rounded-lg border-0 px-3 py-2 font-mono text-sm text-slate-900 ring-1 ring-slate-300 focus:ring-2 focus:ring-indigo-600 focus:outline-none disabled:bg-slate-50 disabled:text-slate-500"
+            [attr.aria-invalid]="showError(form.controls.code)"
+          />
+          @if (isEdit()) {
+            <p class="mt-1 text-xs text-slate-500">A code cannot be changed once the warehouse exists.</p>
+          }
+          @if (showError(form.controls.code)) {
+            <p class="mt-1 text-sm text-red-600">
+              @if (form.controls.code.hasError('required') || form.controls.code.hasError('pattern')) {
+                Warehouse code is required.
+              } @else if (form.controls.code.hasError('maxlength')) {
+                Warehouse code must be {{ limits.codeMaxLength }} characters or fewer.
+              } @else {
+                Use letters, digits, dots, hyphens, underscores and slashes, starting with a letter or digit.
+              }
+            </p>
+          }
+          @if (serverError('code'); as message) {
+            <p class="mt-1 text-sm text-red-600">{{ message }}</p>
+          }
+        </div>
+
+        <div>
+          <label for="name" class="block text-sm font-medium text-slate-700">Name</label>
+          <input
+            id="name"
+            type="text"
+            formControlName="name"
+            class="mt-1 block w-full rounded-lg border-0 px-3 py-2 text-sm text-slate-900 ring-1 ring-slate-300 focus:ring-2 focus:ring-indigo-600 focus:outline-none disabled:bg-slate-50 disabled:text-slate-500"
+            [attr.aria-invalid]="showError(form.controls.name)"
+          />
+          @if (showError(form.controls.name)) {
+            <p class="mt-1 text-sm text-red-600">
+              @if (form.controls.name.hasError('required') || form.controls.name.hasError('pattern')) {
+                Warehouse name is required.
+              } @else {
+                Warehouse name must be {{ limits.nameMaxLength }} characters or fewer.
+              }
+            </p>
+          }
+          @if (serverError('name'); as message) {
+            <p class="mt-1 text-sm text-red-600">{{ message }}</p>
+          }
+        </div>
+      </div>
+
+      <fieldset formGroupName="address" class="space-y-5">
+        <legend class="text-sm font-semibold text-slate-900">Address</legend>
+
+        <div>
+          <label for="line1" class="block text-sm font-medium text-slate-700">Address line 1</label>
+          <input
+            id="line1"
+            type="text"
+            formControlName="line1"
+            class="mt-1 block w-full rounded-lg border-0 px-3 py-2 text-sm text-slate-900 ring-1 ring-slate-300 focus:ring-2 focus:ring-indigo-600 focus:outline-none disabled:bg-slate-50 disabled:text-slate-500"
+            [attr.aria-invalid]="showError(address.line1)"
+          />
+          @if (showError(address.line1)) {
+            <p class="mt-1 text-sm text-red-600">
+              @if (address.line1.hasError('required') || address.line1.hasError('pattern')) {
+                Address line 1 is required.
+              } @else {
+                Address line 1 must be {{ limits.lineMaxLength }} characters or fewer.
+              }
+            </p>
+          }
+          @if (serverError('address.line1'); as message) {
+            <p class="mt-1 text-sm text-red-600">{{ message }}</p>
+          }
+        </div>
+
+        <div>
+          <label for="line2" class="block text-sm font-medium text-slate-700">Address line 2 <span class="font-normal text-slate-400">(optional)</span></label>
+          <input
+            id="line2"
+            type="text"
+            formControlName="line2"
+            class="mt-1 block w-full rounded-lg border-0 px-3 py-2 text-sm text-slate-900 ring-1 ring-slate-300 focus:ring-2 focus:ring-indigo-600 focus:outline-none disabled:bg-slate-50 disabled:text-slate-500"
+            [attr.aria-invalid]="showError(address.line2)"
+          />
+          @if (showError(address.line2)) {
+            <p class="mt-1 text-sm text-red-600">Address line 2 must be {{ limits.lineMaxLength }} characters or fewer.</p>
+          }
+          @if (serverError('address.line2'); as message) {
+            <p class="mt-1 text-sm text-red-600">{{ message }}</p>
+          }
+        </div>
+
+        <div class="grid gap-5 sm:grid-cols-2">
+          <div>
+            <label for="city" class="block text-sm font-medium text-slate-700">City</label>
+            <input
+              id="city"
+              type="text"
+              formControlName="city"
+              class="mt-1 block w-full rounded-lg border-0 px-3 py-2 text-sm text-slate-900 ring-1 ring-slate-300 focus:ring-2 focus:ring-indigo-600 focus:outline-none disabled:bg-slate-50 disabled:text-slate-500"
+              [attr.aria-invalid]="showError(address.city)"
+            />
+            @if (showError(address.city)) {
+              <p class="mt-1 text-sm text-red-600">
+                @if (address.city.hasError('required') || address.city.hasError('pattern')) {
+                  City is required.
+                } @else {
+                  City must be {{ limits.cityMaxLength }} characters or fewer.
+                }
+              </p>
+            }
+            @if (serverError('address.city'); as message) {
+              <p class="mt-1 text-sm text-red-600">{{ message }}</p>
+            }
+          </div>
+
+          <div>
+            <label for="region" class="block text-sm font-medium text-slate-700">Region <span class="font-normal text-slate-400">(optional)</span></label>
+            <input
+              id="region"
+              type="text"
+              formControlName="region"
+              class="mt-1 block w-full rounded-lg border-0 px-3 py-2 text-sm text-slate-900 ring-1 ring-slate-300 focus:ring-2 focus:ring-indigo-600 focus:outline-none disabled:bg-slate-50 disabled:text-slate-500"
+              [attr.aria-invalid]="showError(address.region)"
+            />
+            @if (showError(address.region)) {
+              <p class="mt-1 text-sm text-red-600">Region must be {{ limits.regionMaxLength }} characters or fewer.</p>
+            }
+            @if (serverError('address.region'); as message) {
+              <p class="mt-1 text-sm text-red-600">{{ message }}</p>
+            }
+          </div>
+
+          <div>
+            <label for="postalCode" class="block text-sm font-medium text-slate-700">Postal code <span class="font-normal text-slate-400">(optional)</span></label>
+            <input
+              id="postalCode"
+              type="text"
+              formControlName="postalCode"
+              class="mt-1 block w-full rounded-lg border-0 px-3 py-2 text-sm text-slate-900 ring-1 ring-slate-300 focus:ring-2 focus:ring-indigo-600 focus:outline-none disabled:bg-slate-50 disabled:text-slate-500"
+              [attr.aria-invalid]="showError(address.postalCode)"
+            />
+            @if (showError(address.postalCode)) {
+              <p class="mt-1 text-sm text-red-600">Postal code must be {{ limits.postalCodeMaxLength }} characters or fewer.</p>
+            }
+            @if (serverError('address.postalCode'); as message) {
+              <p class="mt-1 text-sm text-red-600">{{ message }}</p>
+            }
+          </div>
+
+          <div>
+            <label for="countryCode" class="block text-sm font-medium text-slate-700">Country code</label>
+            <input
+              id="countryCode"
+              type="text"
+              formControlName="countryCode"
+              maxlength="2"
+              autocomplete="off"
+              class="mt-1 block w-full rounded-lg border-0 px-3 py-2 text-sm text-slate-900 ring-1 ring-slate-300 focus:ring-2 focus:ring-indigo-600 focus:outline-none disabled:bg-slate-50 disabled:text-slate-500"
+              [attr.aria-invalid]="showError(address.countryCode)"
+            />
+            <p class="mt-1 text-xs text-slate-500">Two letters, for example NL, BE or IN.</p>
+            @if (showError(address.countryCode)) {
+              <p class="mt-1 text-sm text-red-600">
+                @if (address.countryCode.hasError('required')) {
+                  Country code is required.
+                } @else {
+                  Country code must be a 2-letter ISO code such as IN or NL.
+                }
+              </p>
+            }
+            @if (serverError('address.countryCode'); as message) {
+              <p class="mt-1 text-sm text-red-600">{{ message }}</p>
+            }
+          </div>
+        </div>
+      </fieldset>
+
+      @if (isEdit() && !canUpdate()) {
+        <p class="text-sm text-slate-500">You can view this warehouse but not change it.</p>
+      } @else {
+        <div class="flex flex-wrap items-center gap-3 pt-2">
+          <button
+            type="submit"
+            [disabled]="saving()"
+            class="rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {{ saving() ? 'Saving…' : isEdit() ? 'Save changes' : 'Create warehouse' }}
+          </button>
+
+          @if (isEdit() && warehouse(); as current) {
+            <button
+              type="button"
+              (click)="toggleActive()"
+              [disabled]="saving()"
+              class="rounded-lg px-4 py-2.5 text-sm font-medium text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50 disabled:opacity-60"
+            >
+              {{ current.isActive ? 'Deactivate' : 'Reactivate' }}
+            </button>
+          }
+
+          <a routerLink="/warehouses" class="text-sm text-slate-500 hover:text-slate-700">Cancel</a>
+        </div>
+      }
+    </form>
+
+    @if (warehouse(); as current) {
+      <div class="mt-6">
+        <app-location-tree [warehouseId]="current.id" [canEdit]="canUpdate()" [warehouseActive]="current.isActive" />
+      </div>
+    }
+  }
+</section>

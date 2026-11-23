@@ -1,6 +1,7 @@
 ﻿using EnterpriseOMS.Application.Common.Interfaces;
 using EnterpriseOMS.Application.Common.Security;
 using EnterpriseOMS.Domain.Entities.Identity;
+using EnterpriseOMS.Domain.Entities.Tenancy;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -19,12 +20,16 @@ namespace EnterpriseOMS.Infrastructure.Persistence.Seed
     ///    Permissions constants class, so adding a constant there is enough. The next
     ///    startup inserts it and grants it to Admin automatically.
     /// 2. System roles: Admin (all permissions) and Employee (baseline, no permissions yet).
-    /// 3. An optional bootstrap admin user, from configuration.
+    /// 3. The "Default Organization" (code "default").
+    /// 4. An optional bootstrap admin user in that organization, from configuration.
     /// </summary>
     public class IdentitySeeder
     {
-        public const string AdminRoleName = "Admin";
-        public const string EmployeeRoleName = "Employee";
+        public const string AdminRoleName = RoleNames.Admin;
+        public const string EmployeeRoleName = RoleNames.Employee;
+
+        public const string DefaultOrganizationCode = "default";
+        public const string DefaultOrganizationName = "Default Organization";
 
         private readonly ApplicationDbContext _context;
         private readonly IPasswordHasher _passwordHasher;
@@ -47,7 +52,9 @@ namespace EnterpriseOMS.Infrastructure.Persistence.Seed
         {
             await SeedPermissionsAsync(cancellationToken);
             await SeedRolesAsync(cancellationToken);
-            await SeedAdminUserAsync(cancellationToken);
+
+            var organization = await SeedDefaultOrganizationAsync(cancellationToken);
+            await SeedAdminUserAsync(organization, cancellationToken);
         }
 
         private async Task SeedPermissionsAsync(CancellationToken ct)
@@ -101,7 +108,7 @@ namespace EnterpriseOMS.Infrastructure.Persistence.Seed
                 admin.AssignPermission(permission);   // no-op if already assigned
             }
 
-            // --- Employee: baseline role for self-registration ---
+            // --- Employee: baseline role for users an admin adds later ---
             var employeeExists = await _context.Roles.AnyAsync(r => r.Name == EmployeeRoleName, ct);
             if (!employeeExists)
             {
@@ -116,7 +123,23 @@ namespace EnterpriseOMS.Infrastructure.Persistence.Seed
             await _context.SaveChangesAsync(ct);
         }
 
-        private async Task SeedAdminUserAsync(CancellationToken ct)
+        private async Task<Organization> SeedDefaultOrganizationAsync(CancellationToken ct)
+        {
+            var existing = await _context.Organizations
+                .IgnoreQueryFilters()
+                .FirstOrDefaultAsync(o => o.Code == DefaultOrganizationCode, ct);
+
+            if (existing is not null) return existing;
+
+            var organization = Organization.Create(DefaultOrganizationName, DefaultOrganizationCode);
+            _context.Organizations.Add(organization);
+            await _context.SaveChangesAsync(ct);
+
+            _logger.LogInformation("Seeded default organization '{Code}'.", DefaultOrganizationCode);
+            return organization;
+        }
+
+        private async Task SeedAdminUserAsync(Organization organization, CancellationToken ct)
         {
             if (string.IsNullOrWhiteSpace(_adminSettings.Email) ||
                 string.IsNullOrWhiteSpace(_adminSettings.Password))
@@ -127,7 +150,9 @@ namespace EnterpriseOMS.Infrastructure.Persistence.Seed
 
             var normalizedEmail = _adminSettings.Email.Trim().ToUpperInvariant();
 
-            var exists = await _context.Users.AnyAsync(u => u.NormalizedEmail == normalizedEmail, ct);
+            var exists = await _context.Users
+                .IgnoreQueryFilters()
+                .AnyAsync(u => u.NormalizedEmail == normalizedEmail, ct);
             if (exists) return;
 
             var adminRole = await _context.Roles.FirstAsync(r => r.Name == AdminRoleName, ct);
@@ -138,7 +163,7 @@ namespace EnterpriseOMS.Infrastructure.Persistence.Seed
                 Email = _adminSettings.Email.Trim(),
                 NormalizedEmail = normalizedEmail,
                 PasswordHash = _passwordHasher.Hash(_adminSettings.Password),
-                OrganizationId = _adminSettings.OrganizationId,
+                OrganizationId = organization.Id,
                 RoleId = adminRole.Id,
                 IsActive = true
             });

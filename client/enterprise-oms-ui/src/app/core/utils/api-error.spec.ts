@@ -37,6 +37,24 @@ describe('parseApiError', () => {
     expect(parseApiError(httpError(400, { title: 'Bad thing.' })).message).toBe('Bad thing.');
   });
 
+    it('camelCases every part of a nested field name such as Address.CountryCode', () => {
+    const result = parseApiError(
+      httpError(400, {
+        errors: {
+          'Address.CountryCode': ['Country code must be a 2-letter ISO code such as IN or NL.'],
+          'Address.Line1': ['Address line 1 is required.'],
+          Code: ['A warehouse with this code already exists.'],
+        },
+      }),
+    );
+
+    expect(result.fieldErrors).toEqual({
+      'address.countryCode': ['Country code must be a 2-letter ISO code such as IN or NL.'],
+      'address.line1': ['Address line 1 is required.'],
+      code: ['A warehouse with this code already exists.'],
+    });
+  });
+
   it('maps 401, 403 and 404 to friendly messages', () => {
     expect(parseApiError(httpError(401)).message).toBe('Your session has expired. Please sign in again.');
     expect(parseApiError(httpError(403)).message).toBe('You do not have permission to do that.');

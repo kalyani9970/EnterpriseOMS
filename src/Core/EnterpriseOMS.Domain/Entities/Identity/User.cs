@@ -1,4 +1,5 @@
 ﻿using EnterpriseOMS.Domain.Common;
+using EnterpriseOMS.Domain.Entities.Tenancy;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace EnterpriseOMS.Domain.Entities.Identity
 {
-    public class User : BaseAuditableEntity, IAggregateRoot
+    public class User : BaseAuditableEntity, IAggregateRoot, ITenantEntity
     {
         public string FullName { get; set; } = default!;
         public string Email { get; set; } = default!;
@@ -16,8 +17,9 @@ namespace EnterpriseOMS.Domain.Entities.Identity
         public bool IsActive { get; set; } = true;
         public DateTime? LastLoginAt { get; set; }
 
-        // Multi-tenancy boundary — every user belongs to exactly one organization.
+        // Multi-tenancy boundary: every user belongs to exactly one organization.
         public int OrganizationId { get; set; }
+        public Organization Organization { get; set; } = default!;
 
         public int RoleId { get; set; }
         public Role Role { get; set; } = default!;

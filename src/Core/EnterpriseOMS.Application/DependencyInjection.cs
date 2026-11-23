@@ -19,12 +19,14 @@ public static class DependencyInjection
         {
             cfg.RegisterServicesFromAssembly(assembly);
 
-            // Order matters: exception handling wraps everything, then logging,
-            // then validation runs LAST before the handler so we don't log
-            // requests that fail validation as if they were "handled".
+            // Order matters: the first registered is the outermost layer.
+            // exception handling wraps everything, then logging, then validation, and the
+            // transaction opens LAST before the handler, so we never start a transaction (or log
+            // as "handled") for a request that fails validation.
             cfg.AddOpenBehavior(typeof(UnhandledExceptionBehavior<,>));
             cfg.AddOpenBehavior(typeof(LoggingBehavior<,>));
             cfg.AddOpenBehavior(typeof(ValidationBehavior<,>));
+            cfg.AddOpenBehavior(typeof(TransactionBehavior<,>));   // only for ITransactionalCommand requests
         });
 
         return services;

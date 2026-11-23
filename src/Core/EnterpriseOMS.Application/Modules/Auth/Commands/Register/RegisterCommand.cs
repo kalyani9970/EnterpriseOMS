@@ -1,23 +1,22 @@
-﻿using EnterpriseOMS.Application.Modules.Auth.DTOs;
+﻿using EnterpriseOMS.Application.Common.Interfaces;
+using EnterpriseOMS.Application.Modules.Auth.DTOs;
 using MediatR;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace EnterpriseOMS.Application.Modules.Auth.Commands.Register
+namespace EnterpriseOMS.Application.Modules.Auth.Commands.Register;
+
+/// <summary>
+/// Self-service sign-up: creates a NEW organization and its first user, who becomes that
+/// organization's Admin. There is intentionally no OrganizationId or RoleId here. Letting a
+/// caller pick an existing organization would let anyone join any company, and letting them
+/// pick a role would let anyone make themselves an admin. Further users are added by an
+/// organization admin (Users module).
+/// It is a transactional command: the handler saves in two steps (organization + user, then the
+/// refresh token), and the pipeline now makes those steps all-or-nothing.
+/// </summary>
+public class RegisterCommand : IRequest<AuthResultDto>, ITransactionalCommand
 {
-    public class RegisterCommand : IRequest<AuthResultDto>
-    {
-        public string FullName { get; set; } = default!;
-        public string Email { get; set; } = default!;
-        public string Password { get; set; } = default!;
-        public int OrganizationId { get; set; }
-
-        // Defaults to a baseline "Employee" role if omitted; only elevated
-        // roles should be assignable through an admin-only invite flow later,
-        // not through open self-registration.
-        public int? RoleId { get; set; }
-    }
+    public string FullName { get; set; } = default!;
+    public string Email { get; set; } = default!;
+    public string Password { get; set; } = default!;
+    public string OrganizationName { get; set; } = default!;
 }

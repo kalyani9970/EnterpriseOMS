@@ -60,7 +60,7 @@ describe('AuthService', () => {
 
   it('register starts a session just like login', () => {
     service
-      .register({ fullName: 'Jane Doe', email: 'jane@example.com', password: 'Passw0rd1', organizationId: 1 })
+      .register({ fullName: 'Jane Doe', email: 'jane@example.com', password: 'Passw0rd1', organizationName: 'Acme Traders' })
       .subscribe();
 
     http.expectOne(`${api}/auth/register`).flush(makeAuthResult(makeAccessToken(), 'refresh-1'));

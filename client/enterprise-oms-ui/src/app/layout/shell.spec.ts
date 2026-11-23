@@ -56,6 +56,31 @@ describe('Shell', () => {
     expect(navLinks(await render())).toEqual(['Home']);
   });
 
+    it('shows the Products link only to users who hold products.view', async () => {
+    signIn(['products.view']);
+    expect(navLinks(await render())).toEqual(['Home', 'Products']);
+  });
+
+    it('shows the Warehouses link only to users who hold warehouses.view', async () => {
+    signIn(['warehouses.view']);
+    expect(navLinks(await render())).toEqual(['Home', 'Warehouses']);
+  });
+
+    it('keeps the links in a fixed order: Home, Products, Warehouses, Organization, Roles', async () => {
+    signIn(['roles.view', 'organizations.view', 'warehouses.view', 'products.view']);
+    expect(navLinks(await render())).toEqual(['Home', 'Products', 'Warehouses', 'Organization', 'Roles']);
+  });
+  
+    it('shows the Organization link only to users who hold organizations.view', async () => {
+    signIn(['organizations.view']);
+    expect(navLinks(await render())).toEqual(['Home', 'Organization']);
+  });
+
+  it('lists Organization before Roles when the user holds both permissions', async () => {
+    signIn(['roles.view', 'organizations.view']);
+    expect(navLinks(await render())).toEqual(['Home', 'Organization', 'Roles']);
+  });
+
   it('signs out when the button is clicked', async () => {
     signIn(['users.view']);
     vi.spyOn(TestBed.inject(Router), 'navigate').mockResolvedValue(true);

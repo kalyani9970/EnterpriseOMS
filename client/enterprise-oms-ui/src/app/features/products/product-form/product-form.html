@@ -1,0 +1,261 @@
+<section class="mx-auto max-w-3xl">
+  <a routerLink="/products" class="text-sm text-slate-500 hover:text-slate-700">← Back to products</a>
+
+  <div class="mt-3 flex items-start justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-semibold text-slate-900">{{ isEdit() ? 'Edit product' : 'New product' }}</h1>
+      @if (product(); as current) {
+        <p class="mt-1 font-mono text-xs text-slate-500">{{ current.sku }}</p>
+      }
+    </div>
+
+    @if (product(); as current) {
+      @if (current.isActive) {
+        <span class="rounded-full bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700">Active</span>
+      } @else {
+        <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">Inactive</span>
+      }
+    }
+  </div>
+
+  @if (loadStatus() === 'loading') {
+    <p class="mt-6 text-sm text-slate-500" role="status">Loading product…</p>
+  } @else if (loadStatus() === 'notFound') {
+    <div role="alert" class="mt-6 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-200">
+      That product could not be found. It may have been removed, or it belongs to another organization.
+    </div>
+  } @else if (loadStatus() === 'error') {
+    <div role="alert" class="mt-6 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-200">
+      <p>{{ errorMessage() }}</p>
+      <button type="button" (click)="load()" class="mt-2 font-medium underline">Try again</button>
+    </div>
+  } @else {
+    @if (conflict()) {
+      <div role="alert" class="mt-6 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800 ring-1 ring-amber-200">
+        <p class="font-medium">Someone else changed this product while you were editing.</p>
+        <p class="mt-1">Your changes were not saved. Load the latest version, then apply your edits again.</p>
+        <button type="button" (click)="reloadLatest()" class="mt-2 font-medium underline">Load the latest version</button>
+      </div>
+    } @else if (errorMessage(); as message) {
+      <div role="alert" class="mt-6 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-200">
+        {{ message }}
+      </div>
+    }
+
+    @if (saved()) {
+      <p role="status" class="mt-6 text-sm font-medium text-green-700">Saved.</p>
+    }
+
+    <form [formGroup]="form" (ngSubmit)="save()" novalidate class="mt-6 space-y-5 rounded-xl bg-white p-6 ring-1 ring-slate-200">
+      <div class="grid gap-5 sm:grid-cols-2">
+        <div>
+          <label for="sku" class="block text-sm font-medium text-slate-700">SKU</label>
+          <input
+            id="sku"
+            type="text"
+            formControlName="sku"
+            autocomplete="off"
+            class="mt-1 block w-full rounded-lg border-0 px-3 py-2 font-mono text-sm text-slate-900 ring-1 ring-slate-300 focus:ring-2 focus:ring-indigo-600 focus:outline-none disabled:bg-slate-50 disabled:text-slate-500"
+            [attr.aria-invalid]="showError(form.controls.sku)"
+          />
+          @if (isEdit()) {
+            <p class="mt-1 text-xs text-slate-500">A SKU cannot be changed once the product exists.</p>
+          }
+          @if (showError(form.controls.sku)) {
+            <p class="mt-1 text-sm text-red-600">
+              @if (form.controls.sku.hasError('required') || form.controls.sku.hasError('pattern')) {
+                SKU is required.
+              } @else if (form.controls.sku.hasError('maxlength')) {
+                SKU must be {{ limits.skuMaxLength }} characters or fewer.
+              } @else {
+                Use letters, digits, dots, hyphens, underscores and slashes, starting with a letter or digit.
+              }
+            </p>
+          }
+          @if (serverError('sku'); as message) {
+            <p class="mt-1 text-sm text-red-600">{{ message }}</p>
+          }
+        </div>
+
+        <div>
+          <label for="name" class="block text-sm font-medium text-slate-700">Name</label>
+          <input
+            id="name"
+            type="text"
+            formControlName="name"
+            class="mt-1 block w-full rounded-lg border-0 px-3 py-2 text-sm text-slate-900 ring-1 ring-slate-300 focus:ring-2 focus:ring-indigo-600 focus:outline-none disabled:bg-slate-50 disabled:text-slate-500"
+            [attr.aria-invalid]="showError(form.controls.name)"
+          />
+          @if (showError(form.controls.name)) {
+            <p class="mt-1 text-sm text-red-600">
+              @if (form.controls.name.hasError('required') || form.controls.name.hasError('pattern')) {
+                Product name is required.
+              } @else {
+                Product name must be {{ limits.nameMaxLength }} characters or fewer.
+              }
+            </p>
+          }
+          @if (serverError('name'); as message) {
+            <p class="mt-1 text-sm text-red-600">{{ message }}</p>
+          }
+        </div>
+      </div>
+
+      <div>
+        <label for="description" class="block text-sm font-medium text-slate-700">Description <span class="font-normal text-slate-400">(optional)</span></label>
+        <textarea
+          id="description"
+          rows="3"
+          formControlName="description"
+          class="mt-1 block w-full rounded-lg border-0 px-3 py-2 text-sm text-slate-900 ring-1 ring-slate-300 focus:ring-2 focus:ring-indigo-600 focus:outline-none disabled:bg-slate-50 disabled:text-slate-500"
+          [attr.aria-invalid]="showError(form.controls.description)"
+        ></textarea>
+        @if (showError(form.controls.description)) {
+          <p class="mt-1 text-sm text-red-600">Description must be {{ limits.descriptionMaxLength }} characters or fewer.</p>
+        }
+      </div>
+
+      <div class="grid gap-5 sm:grid-cols-2">
+        <div>
+          <label for="category" class="block text-sm font-medium text-slate-700">Category <span class="font-normal text-slate-400">(optional)</span></label>
+          <input
+            id="category"
+            type="text"
+            list="category-suggestions"
+            formControlName="category"
+            class="mt-1 block w-full rounded-lg border-0 px-3 py-2 text-sm text-slate-900 ring-1 ring-slate-300 focus:ring-2 focus:ring-indigo-600 focus:outline-none disabled:bg-slate-50 disabled:text-slate-500"
+            [attr.aria-invalid]="showError(form.controls.category)"
+          />
+          <datalist id="category-suggestions">
+            @for (item of categories(); track item) {
+              <option [value]="item"></option>
+            }
+          </datalist>
+          @if (showError(form.controls.category)) {
+            <p class="mt-1 text-sm text-red-600">Category must be {{ limits.categoryMaxLength }} characters or fewer.</p>
+          }
+        </div>
+
+        <div>
+          <label for="unitOfMeasure" class="block text-sm font-medium text-slate-700">Unit of measure</label>
+          <select
+            id="unitOfMeasure"
+            formControlName="unitOfMeasure"
+            class="mt-1 block w-full rounded-lg border-0 px-3 py-2 text-sm text-slate-900 ring-1 ring-slate-300 focus:ring-2 focus:ring-indigo-600 focus:outline-none disabled:bg-slate-50 disabled:text-slate-500"
+          >
+            @for (unit of units; track unit) {
+              <option [value]="unit">{{ unit }}</option>
+            }
+          </select>
+        </div>
+      </div>
+
+      <div class="grid gap-5 sm:grid-cols-3">
+        <div>
+          <label for="unitPrice" class="block text-sm font-medium text-slate-700">Unit price</label>
+          <input
+            id="unitPrice"
+            type="number"
+            step="0.01"
+            min="0"
+            formControlName="unitPrice"
+            class="mt-1 block w-full rounded-lg border-0 px-3 py-2 text-sm text-slate-900 ring-1 ring-slate-300 focus:ring-2 focus:ring-indigo-600 focus:outline-none disabled:bg-slate-50 disabled:text-slate-500"
+            [attr.aria-invalid]="showError(form.controls.unitPrice)"
+          />
+          @if (showError(form.controls.unitPrice)) {
+            <p class="mt-1 text-sm text-red-600">
+              @if (form.controls.unitPrice.hasError('required')) {
+                Unit price is required.
+              } @else if (form.controls.unitPrice.hasError('maxTwoDecimals')) {
+                Unit price can have at most 2 decimal places.
+              } @else {
+                Unit price must be between 0 and 999,999,999.99.
+              }
+            </p>
+          }
+          @if (serverError('unitPrice'); as message) {
+            <p class="mt-1 text-sm text-red-600">{{ message }}</p>
+          }
+        </div>
+
+        <div>
+          <label for="costPrice" class="block text-sm font-medium text-slate-700">Cost price</label>
+          <input
+            id="costPrice"
+            type="number"
+            step="0.01"
+            min="0"
+            formControlName="costPrice"
+            class="mt-1 block w-full rounded-lg border-0 px-3 py-2 text-sm text-slate-900 ring-1 ring-slate-300 focus:ring-2 focus:ring-indigo-600 focus:outline-none disabled:bg-slate-50 disabled:text-slate-500"
+            [attr.aria-invalid]="showError(form.controls.costPrice)"
+          />
+          @if (showError(form.controls.costPrice)) {
+            <p class="mt-1 text-sm text-red-600">
+              @if (form.controls.costPrice.hasError('required')) {
+                Cost price is required.
+              } @else if (form.controls.costPrice.hasError('maxTwoDecimals')) {
+                Cost price can have at most 2 decimal places.
+              } @else {
+                Cost price must be between 0 and 999,999,999.99.
+              }
+            </p>
+          }
+          @if (serverError('costPrice'); as message) {
+            <p class="mt-1 text-sm text-red-600">{{ message }}</p>
+          }
+        </div>
+
+        <div>
+          <label for="reorderLevel" class="block text-sm font-medium text-slate-700">Reorder level</label>
+          <input
+            id="reorderLevel"
+            type="number"
+            step="1"
+            min="0"
+            formControlName="reorderLevel"
+            class="mt-1 block w-full rounded-lg border-0 px-3 py-2 text-sm text-slate-900 ring-1 ring-slate-300 focus:ring-2 focus:ring-indigo-600 focus:outline-none disabled:bg-slate-50 disabled:text-slate-500"
+            [attr.aria-invalid]="showError(form.controls.reorderLevel)"
+          />
+          @if (showError(form.controls.reorderLevel)) {
+            <p class="mt-1 text-sm text-red-600">
+              @if (form.controls.reorderLevel.hasError('required')) {
+                Reorder level is required.
+              } @else if (form.controls.reorderLevel.hasError('wholeNumber')) {
+                Reorder level must be a whole number.
+              } @else {
+                Reorder level must be between 0 and 1,000,000.
+              }
+            </p>
+          }
+        </div>
+      </div>
+
+      @if (isEdit() && !canUpdate()) {
+        <p class="text-sm text-slate-500">You can view this product but not change it.</p>
+      } @else {
+        <div class="flex flex-wrap items-center gap-3 pt-2">
+          <button
+            type="submit"
+            [disabled]="saving()"
+            class="rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {{ saving() ? 'Saving…' : isEdit() ? 'Save changes' : 'Create product' }}
+          </button>
+
+          @if (isEdit() && product(); as current) {
+            <button
+              type="button"
+              (click)="toggleActive()"
+              [disabled]="saving()"
+              class="rounded-lg px-4 py-2.5 text-sm font-medium text-slate-700 ring-1 ring-slate-300 hover:bg-slate-50 disabled:opacity-60"
+            >
+              {{ current.isActive ? 'Deactivate' : 'Reactivate' }}
+            </button>
+          }
+
+          <a routerLink="/products" class="text-sm text-slate-500 hover:text-slate-700">Cancel</a>
+        </div>
+      }
+    </form>
+  }
+</section>

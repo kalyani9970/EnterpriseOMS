@@ -1,0 +1,184 @@
+<section>
+  <div class="flex items-start justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-semibold text-slate-900">Warehouses</h1>
+      <p class="mt-1 text-sm text-slate-500">The places where your organization keeps stock.</p>
+    </div>
+
+    @if (canCreate()) {
+      <a
+        routerLink="/warehouses/new"
+        class="rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 focus:outline-none"
+      >
+        New warehouse
+      </a>
+    }
+  </div>
+
+  <!-- Filters -->
+  <div class="mt-6 grid gap-3 rounded-xl bg-white p-4 ring-1 ring-slate-200 sm:grid-cols-2">
+    <div>
+      <label for="search" class="block text-xs font-medium text-slate-600">Search</label>
+      <input
+        id="search"
+        type="search"
+        placeholder="Code, name or city"
+        [value]="search()"
+        (input)="onSearchInput($event)"
+        class="mt-1 block w-full rounded-lg border-0 px-3 py-2 text-sm text-slate-900 ring-1 ring-slate-300 focus:ring-2 focus:ring-indigo-600 focus:outline-none"
+      />
+    </div>
+
+    <div>
+      <label for="status" class="block text-xs font-medium text-slate-600">Status</label>
+      <select
+        id="status"
+        (change)="onStatusChange($event)"
+        class="mt-1 block w-full rounded-lg border-0 px-3 py-2 text-sm text-slate-900 ring-1 ring-slate-300 focus:ring-2 focus:ring-indigo-600 focus:outline-none"
+      >
+        <option value="all" [selected]="statusFilter() === 'all'">All</option>
+        <option value="active" [selected]="statusFilter() === 'active'">Active</option>
+        <option value="inactive" [selected]="statusFilter() === 'inactive'">Inactive</option>
+      </select>
+    </div>
+  </div>
+
+  @if (notice(); as message) {
+    <div
+      [attr.role]="message.kind === 'error' ? 'alert' : 'status'"
+      class="mt-4 rounded-lg px-4 py-3 text-sm ring-1"
+      [class]="
+        message.kind === 'error'
+          ? 'bg-red-50 text-red-700 ring-red-200'
+          : 'bg-green-50 text-green-700 ring-green-200'
+      "
+    >
+      {{ message.text }}
+    </div>
+  }
+
+  <div class="mt-4">
+    @if (loadStatus() === 'error') {
+      <div role="alert" class="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-200">
+        <p>{{ loadError() }}</p>
+        <button type="button" (click)="retry()" class="mt-2 font-medium underline">Try again</button>
+      </div>
+    } @else if (page(); as current) {
+      <div class="overflow-x-auto rounded-xl bg-white ring-1 ring-slate-200" [class.opacity-60]="loadStatus() === 'loading'">
+        <table class="min-w-full divide-y divide-slate-200 text-sm">
+          <thead class="bg-slate-50 text-left text-xs font-medium tracking-wide text-slate-500 uppercase">
+            <tr>
+              <th scope="col" class="px-4 py-3" [attr.aria-sort]="ariaSort('code')">
+                <button type="button" (click)="sortByField('code')" class="font-medium uppercase">
+                  Code {{ sortIndicator('code') }}
+                </button>
+              </th>
+              <th scope="col" class="px-4 py-3" [attr.aria-sort]="ariaSort('name')">
+                <button type="button" (click)="sortByField('name')" class="font-medium uppercase">
+                  Name {{ sortIndicator('name') }}
+                </button>
+              </th>
+              <th scope="col" class="px-4 py-3" [attr.aria-sort]="ariaSort('city')">
+                <button type="button" (click)="sortByField('city')" class="font-medium uppercase">
+                  City {{ sortIndicator('city') }}
+                </button>
+              </th>
+              <th scope="col" class="px-4 py-3 text-right">Locations</th>
+              <th scope="col" class="px-4 py-3">Status</th>
+              <th scope="col" class="px-4 py-3"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            @for (warehouse of current.items; track warehouse.id) {
+              <tr>
+                <td class="px-4 py-3 font-mono text-xs text-slate-700">{{ warehouse.code }}</td>
+                <td class="px-4 py-3 font-medium text-slate-900">
+                  <a [routerLink]="['/warehouses', warehouse.id]" class="hover:text-indigo-600">{{ warehouse.name }}</a>
+                </td>
+                <td class="px-4 py-3 text-slate-600">{{ warehouse.city }}, {{ warehouse.countryCode }}</td>
+                <td class="px-4 py-3 text-right text-slate-600">{{ warehouse.locationCount }}</td>
+                <td class="px-4 py-3">
+                  @if (warehouse.isActive) {
+                    <span class="rounded-full bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700">Active</span>
+                  } @else {
+                    <span class="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">Inactive</span>
+                  }
+                </td>
+                <td class="px-4 py-3 text-right">
+                  @if (canUpdate()) {
+                    <a [routerLink]="['/warehouses', warehouse.id]" class="mr-3 text-indigo-600 hover:text-indigo-500">Edit</a>
+                    <button
+                      type="button"
+                      (click)="toggleActive(warehouse)"
+                      [disabled]="busyWarehouseId() === warehouse.id"
+                      class="text-slate-600 hover:text-slate-900 disabled:opacity-50"
+                      [attr.aria-label]="(warehouse.isActive ? 'Deactivate ' : 'Reactivate ') + warehouse.name"
+                    >
+                      {{ warehouse.isActive ? 'Deactivate' : 'Reactivate' }}
+                    </button>
+                  }
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="6" class="px-4 py-10 text-center text-sm text-slate-500">
+                  @if (hasActiveFilters()) {
+                    No warehouses match your search or filters.
+                  } @else {
+                    No warehouses yet.
+                    @if (canCreate()) {
+                      <a routerLink="/warehouses/new" class="font-medium text-indigo-600">Create the first one</a>.
+                    }
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <div class="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-slate-600">
+        <p>
+          @if (current.totalCount > 0) {
+            Showing {{ rangeStart() }}–{{ rangeEnd() }} of {{ current.totalCount }}
+          } @else {
+            0 warehouses
+          }
+        </p>
+
+        <div class="flex items-center gap-3">
+          <label for="pageSize" class="text-xs text-slate-500">Per page</label>
+          <select
+            id="pageSize"
+            (change)="onPageSizeChange($event)"
+            class="rounded-lg border-0 px-2 py-1.5 text-sm ring-1 ring-slate-300 focus:ring-2 focus:ring-indigo-600 focus:outline-none"
+          >
+            @for (size of pageSizes; track size) {
+              <option [value]="size" [selected]="pageSize() === size">{{ size }}</option>
+            }
+          </select>
+
+          <button
+            type="button"
+            (click)="goToPage(current.pageNumber - 1)"
+            [disabled]="!current.hasPreviousPage"
+            class="rounded-lg px-3 py-1.5 ring-1 ring-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Previous
+          </button>
+          <span>Page {{ current.pageNumber }} of {{ current.totalPages || 1 }}</span>
+          <button
+            type="button"
+            (click)="goToPage(current.pageNumber + 1)"
+            [disabled]="!current.hasNextPage"
+            class="rounded-lg px-3 py-1.5 ring-1 ring-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+    } @else {
+      <p class="text-sm text-slate-500" role="status">Loading warehouses…</p>
+    }
+  </div>
+</section>

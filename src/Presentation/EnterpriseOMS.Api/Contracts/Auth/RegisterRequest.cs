@@ -1,12 +1,12 @@
 ﻿namespace EnterpriseOMS.Api.Contracts.Auth
 {
     /// <summary>
-    /// Public registration payload. It deliberately has NO RoleId, so a caller cannot
-    /// choose their own role. Self-registered users always get the baseline "Employee" role.
+    /// Public sign-up payload. It deliberately has NO OrganizationId and NO RoleId: registering
+    /// always creates a brand-new organization and makes the registrant its Admin.
     /// </summary>
     public record RegisterRequest(
         string FullName,
         string Email,
         string Password,
-        int OrganizationId);
+        string OrganizationName);
 }

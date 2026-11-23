@@ -32,6 +32,7 @@ namespace EnterpriseOMS.Application.Modules.Auth.Commands.Logout
         public async Task<Result> Handle(LogoutCommand request, CancellationToken cancellationToken)
         {
             var token = await _context.RefreshTokens
+                .IgnoreQueryFilters()
                 .FirstOrDefaultAsync(rt => rt.Token == request.RefreshToken, cancellationToken);
 
             if (token is not null && token.RevokedAt is null)

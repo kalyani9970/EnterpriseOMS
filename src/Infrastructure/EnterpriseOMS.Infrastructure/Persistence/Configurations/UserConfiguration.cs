@@ -29,6 +29,12 @@ namespace EnterpriseOMS.Infrastructure.Persistence.Configurations
             builder.HasIndex(u => u.NormalizedEmail).IsUnique();
             builder.HasIndex(u => u.OrganizationId);
 
+            // Restrict: an organization that still has users cannot be deleted by accident.
+            builder.HasOne(u => u.Organization)
+                .WithMany()
+                .HasForeignKey(u => u.OrganizationId)
+                .OnDelete(DeleteBehavior.Restrict);
+
             builder.HasOne(u => u.Role)
                 .WithMany(r => r.Users)
                 .HasForeignKey(u => u.RoleId)

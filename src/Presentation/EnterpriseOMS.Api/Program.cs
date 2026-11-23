@@ -1,4 +1,5 @@
 // Bootstrap logger: captures failures that happen before the real logger is configured.
+using System.Text.Json.Serialization;
 using EnterpriseOMS.Api.Extensions;
 using EnterpriseOMS.Api.Middleware;
 using EnterpriseOMS.Application;
@@ -20,7 +21,12 @@ try
     builder.Services.AddInfrastructure(builder.Configuration);
     builder.Services.AddJwtAuthentication(builder.Configuration);
 
-    builder.Services.AddControllers();
+    // Enums are sent and received as readable names ("Piece", "Box"), not as numbers. This keeps the
+    // API self-describing, and Swagger and the Angular client show the same words.
+    builder.Services
+        .AddControllers()
+        .AddJsonOptions(options => options.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
+
     builder.Services.AddSwaggerDocumentation();
 
     var allowedOrigins = builder.Configuration.GetSection("Cors:AllowedOrigins").Get<string[]>()
@@ -55,7 +61,7 @@ try
 
     if (app.Environment.IsDevelopment())
     {
-        // Applies migrations and seeds roles, permissions and the admin user.
+        // Applies migrations and seeds roles, permissions, the admin user and the demo catalog.
         await app.Services.InitialiseDatabaseAsync();
     }
 

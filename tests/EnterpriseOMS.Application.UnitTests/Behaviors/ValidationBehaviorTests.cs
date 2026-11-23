@@ -13,7 +13,7 @@ public class ValidationBehaviorTests
         FullName = "Jane Doe",
         Email = "jane@example.com",
         Password = "Passw0rd1",
-        OrganizationId = 1
+        OrganizationName = "Acme Traders"
     };
 
     private static ValidationBehavior<RegisterCommand, AuthResultDto> CreateBehavior(

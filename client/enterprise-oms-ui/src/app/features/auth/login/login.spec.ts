@@ -137,6 +137,17 @@ describe('Login', () => {
     expect(textOf(root)).toContain('Cannot reach the server.');
   });
 
+    it('explains a deactivated account or organization (403) instead of a permissions message', async () => {
+    await open();
+
+    fillAndSubmit();
+    http.expectOne(`${api}/auth/login`).flush({}, { status: 403, statusText: 'Forbidden' });
+    harness.detectChanges();
+
+    expect(textOf(root)).toContain('This account or its organization has been deactivated.');
+    expect(textOf(root)).not.toContain('permission');
+  });
+
   it('shows a banner when the session expired', async () => {
     await open('/login?reason=expired');
 

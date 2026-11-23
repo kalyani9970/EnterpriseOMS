@@ -38,7 +38,10 @@ describe('Register', () => {
 
   afterEach(() => http.verify());
 
-  function fill(overrides: Partial<Record<'fullName' | 'email' | 'password' | 'confirmPassword', string>> = {}): void {
+  type Field = 'organizationName' | 'fullName' | 'email' | 'password' | 'confirmPassword';
+
+  function fill(overrides: Partial<Record<Field, string>> = {}): void {
+    typeInto(root, '#organizationName', overrides.organizationName ?? 'Acme Traders');
     typeInto(root, '#fullName', overrides.fullName ?? 'Jane Doe');
     typeInto(root, '#email', overrides.email ?? 'jane@example.com');
     typeInto(root, '#password', overrides.password ?? 'Passw0rd1');
@@ -55,8 +58,10 @@ describe('Register', () => {
       (li.textContent ?? '').replace(/\s+/g, ' ').trim(),
     );
 
-  it('starts with the organization defaulted to 1', () => {
-    expect(root.querySelector<HTMLInputElement>('#organizationId')?.value).toBe('1');
+  it('explains that signing up creates a new organization', () => {
+    expect(textOf(root)).toContain('Create your organization');
+    expect(root.querySelector('#organizationId')).toBeNull();   // the old temporary field is gone
+    expect(root.querySelector('#organizationName')).not.toBeNull();
   });
 
   it('ticks off the password checklist live as the user types', () => {
@@ -77,13 +82,39 @@ describe('Register', () => {
   });
 
   it('shows required errors and sends nothing when the form is empty', () => {
-    typeInto(root, '#organizationId', '1');
-
     submit();
 
+    expect(textOf(root)).toContain('Organization name is required.');
     expect(textOf(root)).toContain('Full name is required.');
     expect(textOf(root)).toContain('Email is required.');
     expect(textOf(root)).toContain('Password is required.');
+    http.expectNone(`${api}/auth/register`);
+  });
+
+  it('rejects an organization name made only of spaces', () => {
+    fill({ organizationName: '     ' });
+
+    submit();
+
+    expect(textOf(root)).toContain('Organization name is required.');
+    http.expectNone(`${api}/auth/register`);
+  });
+
+  it('rejects an organization name shorter than 2 characters', () => {
+    fill({ organizationName: 'A' });
+
+    submit();
+
+    expect(textOf(root)).toContain('Organization name must be at least 2 characters.');
+    http.expectNone(`${api}/auth/register`);
+  });
+
+  it('rejects an organization name longer than 200 characters', () => {
+    fill({ organizationName: 'x'.repeat(201) });
+
+    submit();
+
+    expect(textOf(root)).toContain('Organization name must be 200 characters or fewer.');
     http.expectNone(`${api}/auth/register`);
   });
 
@@ -104,27 +135,17 @@ describe('Register', () => {
     http.expectNone(`${api}/auth/register`);
   });
 
-  it('rejects an organization ID below 1', () => {
-    fill();
-    typeInto(root, '#organizationId', '0');
-
-    submit();
-
-    expect(textOf(root)).toContain('Enter a valid organization ID (1 or higher).');
-    http.expectNone(`${api}/auth/register`);
-  });
-
-  it('posts the account details (without the confirmation field) and goes home', () => {
-    fill();
+  it('posts the organization and account details (trimmed, without the confirmation) and goes home', () => {
+    fill({ organizationName: '  Acme Traders  ' });
 
     submit();
 
     const request = http.expectOne(`${api}/auth/register`);
     expect(request.request.body).toEqual({
+      organizationName: 'Acme Traders',
       fullName: 'Jane Doe',
       email: 'jane@example.com',
       password: 'Passw0rd1',
-      organizationId: 1,
     });
     request.flush(makeAuthResult(makeAccessToken(), 'refresh-1'));
 
@@ -146,6 +167,20 @@ describe('Register', () => {
     expect(textOf(root)).toContain('This email is already registered.');
     expect(navigateByUrl).not.toHaveBeenCalled();
     expect(root.querySelector('button[type=submit]')?.hasAttribute('disabled')).toBe(false);
+  });
+
+  it('shows a server error for the organization name under that field', () => {
+    fill();
+
+    submit();
+    http.expectOne(`${api}/auth/register`).flush(
+      { errors: { OrganizationName: ['Organization name must be at least 2 characters.'] } },
+      { status: 400, statusText: 'Bad Request' },
+    );
+    harness.detectChanges();
+
+    const field = root.querySelector<HTMLInputElement>('#organizationName')!.parentElement!;
+    expect(textOf(field)).toContain('Organization name must be at least 2 characters.');
   });
 
   it('clears an earlier server error when the user submits again', () => {

@@ -1,45 +1,43 @@
-﻿using MediatR;
+﻿using EnterpriseOMS.Domain.Common.Exceptions;
+using MediatR;
 using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace EnterpriseOMS.Application.Common.Behaviors
-{
-    /// <summary>
-    /// Catches any exception NOT already a known application exception,
-    /// logs it with full context, then rethrows — so the global exception
-    /// middleware in the API layer can still map it to a proper HTTP response.
-    /// </summary>
-    public class UnhandledExceptionBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
+namespace EnterpriseOMS.Application.Common.Behaviors;
+
+/// <summary>
+/// Logs genuinely UNEXPECTED exceptions with full context, then rethrows so the global exception
+/// middleware in the API layer can still map them to a proper HTTP response.
+/// Expected outcomes (bad input, not found, forbidden, a stale edit, a broken business rule) are
+/// normal control flow, not errors, so they are not logged as "unhandled".
+/// </summary>
+public class UnhandledExceptionBehavior<TRequest, TResponse> : IPipelineBehavior<TRequest, TResponse>
     where TRequest : IRequest<TResponse>
+{
+    private readonly ILogger<UnhandledExceptionBehavior<TRequest, TResponse>> _logger;
+
+    public UnhandledExceptionBehavior(ILogger<UnhandledExceptionBehavior<TRequest, TResponse>> logger)
     {
-        private readonly ILogger<UnhandledExceptionBehavior<TRequest, TResponse>> _logger;
+        _logger = logger;
+    }
 
-        public UnhandledExceptionBehavior(ILogger<UnhandledExceptionBehavior<TRequest, TResponse>> logger)
+    public async Task<TResponse> Handle(
+        TRequest request,
+        RequestHandlerDelegate<TResponse> next,
+        CancellationToken cancellationToken)
+    {
+        try
         {
-            _logger = logger;
+            return await next(cancellationToken);
         }
-
-        public async Task<TResponse> Handle(
-            TRequest request,
-            RequestHandlerDelegate<TResponse> next,
-            CancellationToken cancellationToken)
+        catch (Exception ex) when (ex is not Exceptions.ValidationException
+                                        and not Exceptions.NotFoundException
+                                        and not Exceptions.ForbiddenAccessException
+                                        and not Exceptions.ConcurrencyException
+                                        and not DomainException)
         {
-            try
-            {
-                return await next();
-            }
-            catch (Exception ex) when (ex is not Exceptions.ValidationException
-                                            and not Exceptions.NotFoundException
-                                            and not Exceptions.ForbiddenAccessException)
-            {
-                var requestName = typeof(TRequest).Name;
-                _logger.LogError(ex, "Unhandled Exception for Request {Name} {@Request}", requestName, request);
-                throw;
-            }
+            var requestName = typeof(TRequest).Name;
+            _logger.LogError(ex, "Unhandled Exception for Request {Name} {@Request}", requestName, request);
+            throw;
         }
     }
 }

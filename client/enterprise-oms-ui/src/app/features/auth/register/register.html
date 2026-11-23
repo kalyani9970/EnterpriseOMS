@@ -7,8 +7,8 @@
       >
         OMS
       </div>
-      <h1 class="text-2xl font-semibold text-slate-900">Create your account</h1>
-      <p class="mt-1 text-sm text-slate-500">New accounts start with the Employee role.</p>
+      <h1 class="text-2xl font-semibold text-slate-900">Create your organization</h1>
+      <p class="mt-1 text-sm text-slate-500">You will be its administrator and can add your team afterwards.</p>
     </div>
 
     <div class="rounded-2xl bg-white p-8 shadow-sm ring-1 ring-slate-200">
@@ -20,7 +20,33 @@
 
       <form [formGroup]="form" (ngSubmit)="submit()" novalidate class="space-y-5">
         <div>
-          <label for="fullName" class="block text-sm font-medium text-slate-700">Full name</label>
+          <label for="organizationName" class="block text-sm font-medium text-slate-700">Organization name</label>
+          <input
+            id="organizationName"
+            type="text"
+            formControlName="organizationName"
+            autocomplete="organization"
+            class="mt-1 block w-full rounded-lg border-0 px-3 py-2 text-slate-900 ring-1 ring-slate-300 focus:ring-2 focus:ring-indigo-600 focus:outline-none"
+            [attr.aria-invalid]="showError(form.controls.organizationName)"
+          />
+          @if (showError(form.controls.organizationName)) {
+            <p class="mt-1 text-sm text-red-600">
+              @if (form.controls.organizationName.hasError('required') || form.controls.organizationName.hasError('pattern')) {
+                Organization name is required.
+              } @else if (form.controls.organizationName.hasError('minlength')) {
+                Organization name must be at least 2 characters.
+              } @else {
+                Organization name must be 200 characters or fewer.
+              }
+            </p>
+          }
+          @if (serverError('organizationName'); as message) {
+            <p class="mt-1 text-sm text-red-600">{{ message }}</p>
+          }
+        </div>
+
+        <div>
+          <label for="fullName" class="block text-sm font-medium text-slate-700">Your full name</label>
           <input
             id="fullName"
             type="text"
@@ -107,28 +133,12 @@
           }
         </div>
 
-        <div>
-          <label for="organizationId" class="block text-sm font-medium text-slate-700">Organization ID</label>
-          <input
-            id="organizationId"
-            type="number"
-            min="1"
-            formControlName="organizationId"
-            class="mt-1 block w-full rounded-lg border-0 px-3 py-2 text-slate-900 ring-1 ring-slate-300 focus:ring-2 focus:ring-indigo-600 focus:outline-none"
-            [attr.aria-invalid]="showError(form.controls.organizationId)"
-          />
-          <p class="mt-1 text-xs text-slate-500">Temporary field until the Organization module is built.</p>
-          @if (showError(form.controls.organizationId)) {
-            <p class="mt-1 text-sm text-red-600">Enter a valid organization ID (1 or higher).</p>
-          }
-        </div>
-
         <button
           type="submit"
           [disabled]="submitting()"
           class="flex w-full justify-center rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {{ submitting() ? 'Creating account…' : 'Create account' }}
+          {{ submitting() ? 'Creating organization…' : 'Create organization' }}
         </button>
       </form>
     </div>

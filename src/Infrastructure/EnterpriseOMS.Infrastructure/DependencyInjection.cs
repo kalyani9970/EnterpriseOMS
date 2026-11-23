@@ -8,50 +8,49 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace EnterpriseOMS.Infrastructure
+namespace EnterpriseOMS.Infrastructure;
+
+public static class DependencyInjection
 {
-    public static class DependencyInjection
-    {
-        public static IServiceCollection AddInfrastructure(
+    public static IServiceCollection AddInfrastructure(
         this IServiceCollection services,
         IConfiguration configuration)
-        {
-            // --- Persistence ---
-            var connectionString = configuration.GetConnectionString("DefaultConnection")
-                ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is not configured.");
+    {
+        // --- Persistence ---
+        var connectionString = configuration.GetConnectionString("DefaultConnection")
+            ?? throw new InvalidOperationException("ConnectionStrings:DefaultConnection is not configured.");
 
-            services.AddDbContext<ApplicationDbContext>(options =>
-                options.UseSqlServer(
-                    connectionString,
-                    sql => sql.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)));
+        services.AddDbContext<ApplicationDbContext>(options =>
+            options.UseSqlServer(
+                connectionString,
+                sql => sql.MigrationsAssembly(typeof(ApplicationDbContext).Assembly.FullName)));
 
-            // Application depends on the interface; resolve it to the same scoped DbContext instance
-            // so handlers and the seeder share one unit of work per request.
-            services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
+        // Application depends on the interfaces; resolve them to the same scoped DbContext instance
+        // so handlers, the transaction behavior and the seeders all share one unit of work per request.
+        services.AddScoped<IApplicationDbContext>(sp => sp.GetRequiredService<ApplicationDbContext>());
+        services.AddScoped<IUnitOfWork>(sp => sp.GetRequiredService<ApplicationDbContext>());
 
-            // --- Options ---
-            services.Configure<JwtSettings>(configuration.GetSection(JwtSettings.SectionName));
-            services.Configure<SeedAdminSettings>(configuration.GetSection(SeedAdminSettings.SectionName));
+        // --- Options ---
+        services.Configure<JwtSettings>(configuration.GetSection(JwtSettings.SectionName));
+        services.Configure<SeedAdminSettings>(configuration.GetSection(SeedAdminSettings.SectionName));
+        services.Configure<SeedDemoDataSettings>(configuration.GetSection(SeedDemoDataSettings.SectionName));
 
-            // --- Services ---
-            services.AddHttpContextAccessor();
-            services.AddScoped<ICurrentUserService, CurrentUserService>();
-            services.AddSingleton<IDateTime, DateTimeService>();
-            services.AddSingleton<IPasswordHasher, PasswordHasherService>();
-            services.AddSingleton<IJwtTokenService, JwtTokenService>();
-            services.AddScoped<IdentitySeeder>();
+        // --- Services ---
+        services.AddHttpContextAccessor();
+        services.AddScoped<ICurrentUserService, CurrentUserService>();
+        services.AddSingleton<IDateTime, DateTimeService>();
+        services.AddSingleton<IPasswordHasher, PasswordHasherService>();
+        services.AddSingleton<IJwtTokenService, JwtTokenService>();
+        services.AddScoped<IdentitySeeder>();
+        services.AddScoped<ProductDemoSeeder>();
+        services.AddScoped<WarehouseDemoSeeder>();
+        services.AddScoped<InventoryDemoSeeder>();
 
-            // --- Authorization (permission-based RBAC) ---
-            services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();
-            services.AddSingleton<IAuthorizationHandler, PermissionAuthorizationHandler>();
+        // --- Authorization (permission-based RBAC) ---
+        services.AddSingleton<IAuthorizationPolicyProvider, PermissionPolicyProvider>();
+        services.AddSingleton<IAuthorizationHandler, PermissionAuthorizationHandler>();
 
-            return services;
-        }
+        return services;
     }
 }

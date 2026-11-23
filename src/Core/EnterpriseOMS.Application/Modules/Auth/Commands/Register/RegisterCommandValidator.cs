@@ -1,4 +1,5 @@
-﻿using FluentValidation;
+﻿using EnterpriseOMS.Domain.Entities.Tenancy;
+using FluentValidation;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -27,8 +28,10 @@ namespace EnterpriseOMS.Application.Modules.Auth.Commands.Register
                 .Matches("[a-z]").WithMessage("Password must contain at least one lowercase letter.")
                 .Matches("[0-9]").WithMessage("Password must contain at least one digit.");
 
-            RuleFor(x => x.OrganizationId)
-                .GreaterThan(0).WithMessage("A valid organization is required.");
+            RuleFor(x => x.OrganizationName)
+                .NotEmpty().WithMessage("Organization name is required.")
+                .MinimumLength(2).WithMessage("Organization name must be at least 2 characters.")
+                .MaximumLength(Organization.NameMaxLength);
         }
     }
 }

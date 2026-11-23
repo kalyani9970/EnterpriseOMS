@@ -1,6 +1,10 @@
-﻿using EnterpriseOMS.Application.Common.Interfaces;
+﻿using EnterpriseOMS.Application.Common.Exceptions;
+using EnterpriseOMS.Application.Common.Interfaces;
+using EnterpriseOMS.Application.Common.Security;
 using EnterpriseOMS.Application.Modules.Auth.DTOs;
+using EnterpriseOMS.Application.Modules.Organizations;
 using EnterpriseOMS.Domain.Entities.Identity;
+using EnterpriseOMS.Domain.Entities.Tenancy;
 using MediatR;
 using Microsoft.EntityFrameworkCore;
 using System;
@@ -34,25 +38,27 @@ namespace EnterpriseOMS.Application.Modules.Auth.Commands.Register
         {
             var normalizedEmail = request.Email.Trim().ToUpperInvariant();
 
+            // IgnoreQueryFilters: sign-up spans ALL organizations (an email is unique platform-wide),
+            // and must not depend on whether the caller happens to carry a token.
             var emailExists = await _context.Users
+                .IgnoreQueryFilters()
                 .AnyAsync(u => u.NormalizedEmail == normalizedEmail, cancellationToken);
 
             if (emailExists)
             {
-                throw new Common.Exceptions.ValidationException(
+                throw new ValidationException(
                     new[] { new FluentValidation.Results.ValidationFailure("Email", "This email is already registered.") });
             }
 
-            // Default new self-registrations to the baseline "Employee" role
-            // unless explicitly provided (e.g., by an admin invite flow).
-            var roleId = request.RoleId;
-            if (roleId is null)
-            {
-                var defaultRole = await _context.Roles
-                    .FirstOrDefaultAsync(r => r.Name == "Employee", cancellationToken)
-                    ?? throw new Common.Exceptions.NotFoundException("Default 'Employee' role not found. Seed data may be missing.");
-                roleId = defaultRole.Id;
-            }
+            var adminRole = await _context.Roles
+                .Include(r => r.RolePermissions)
+                    .ThenInclude(rp => rp.Permission)
+                .FirstOrDefaultAsync(r => r.Name == RoleNames.Admin, cancellationToken)
+                ?? throw new NotFoundException("Default 'Admin' role not found. Seed data may be missing.");
+
+            var organization = Organization.Create(
+                request.OrganizationName,
+                await GenerateUniqueCodeAsync(request.OrganizationName, cancellationToken));
 
             var user = new User
             {
@@ -60,32 +66,29 @@ namespace EnterpriseOMS.Application.Modules.Auth.Commands.Register
                 Email = request.Email.Trim(),
                 NormalizedEmail = normalizedEmail,
                 PasswordHash = _passwordHasher.Hash(request.Password),
-                OrganizationId = request.OrganizationId,
-                RoleId = roleId.Value,
                 IsActive = true,
-                Created = _dateTime.UtcNow
+                Created = _dateTime.UtcNow,
+                Organization = organization,   // EF fills in OrganizationId when both rows are saved
+                Role = adminRole
             };
 
+            _context.Organizations.Add(organization);
             _context.Users.Add(user);
+
+            // One SaveChanges is one database transaction: the organization and its first user
+            // are created together, or neither is.
             await _context.SaveChangesAsync(cancellationToken);
 
-            // Reload with Role + Permissions to build JWT claims accurately.
-            var savedUser = await _context.Users
-                .Include(u => u.Role)
-                    .ThenInclude(r => r.RolePermissions)
-                        .ThenInclude(rp => rp.Permission)
-                .FirstAsync(u => u.Id == user.Id, cancellationToken);
-
-            var permissions = savedUser.Role.RolePermissions
+            var permissions = adminRole.RolePermissions
                 .Select(rp => rp.Permission.Code)
                 .ToList();
 
-            var accessToken = _jwtTokenService.GenerateAccessToken(savedUser, permissions);
+            var accessToken = _jwtTokenService.GenerateAccessToken(user, permissions);
             var refreshTokenValue = _jwtTokenService.GenerateRefreshToken();
 
             _context.RefreshTokens.Add(new RefreshToken
             {
-                UserId = savedUser.Id,
+                UserId = user.Id,
                 Token = refreshTokenValue,
                 CreatedAt = _dateTime.UtcNow,
                 ExpiresAt = _dateTime.UtcNow.AddDays(7)
@@ -94,14 +97,36 @@ namespace EnterpriseOMS.Application.Modules.Auth.Commands.Register
 
             return new AuthResultDto
             {
-                UserId = savedUser.Id,
-                FullName = savedUser.FullName,
-                Email = savedUser.Email,
-                Role = savedUser.Role.Name,
+                UserId = user.Id,
+                FullName = user.FullName,
+                Email = user.Email,
+                Role = adminRole.Name,
                 AccessToken = accessToken,
                 RefreshToken = refreshTokenValue,
                 AccessTokenExpiresAt = _dateTime.UtcNow.AddMinutes(_jwtTokenService.AccessTokenExpiryMinutes)
             };
+        }
+
+        /// <summary>
+        /// "acme" is taken? Try "acme-2", "acme-3"... The unique index on Organizations.Code is the
+        /// real guarantee: two sign-ups racing for the same name could both pass this check, and the
+        /// database would reject the second one.
+        /// </summary>
+        private async Task<string> GenerateUniqueCodeAsync(string organizationName, CancellationToken cancellationToken)
+        {
+            var baseCode = OrganizationCode.FromName(organizationName);
+            var candidate = baseCode;
+            var suffix = 2;
+
+            while (await _context.Organizations
+                       .IgnoreQueryFilters()
+                       .AnyAsync(o => o.Code == candidate, cancellationToken))
+            {
+                candidate = $"{baseCode}-{suffix}";
+                suffix++;
+            }
+
+            return candidate;
         }
     }
 }

@@ -24,9 +24,13 @@ export interface LoginRequest {
   password: string;
 }
 
+/**
+ * Sign-up always creates a NEW organization and makes the registrant its administrator.
+ * There is deliberately no organization ID or role to choose.
+ */
 export interface RegisterRequest {
   fullName: string;
   email: string;
   password: string;
-  organizationId: number;
+  organizationName: string;
 }

@@ -14,4 +14,18 @@ export const Permissions = {
     View: 'roles.view',
     ManagePermissions: 'roles.manage_permissions',
   },
+  Organizations: {
+    View: 'organizations.view',
+    Update: 'organizations.update',
+  },
+  Products: {
+    View: 'products.view',
+    Create: 'products.create',
+    Update: 'products.update',
+  },
+  Warehouses: {
+    View: 'warehouses.view',
+    Create: 'warehouses.create',
+    Update: 'warehouses.update',
+  },
 } as const;

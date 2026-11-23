@@ -42,8 +42,16 @@ export class Login {
         this.submitting.set(false);
         void this.router.navigateByUrl(this.safeReturnUrl());
       },
-      error: (error: unknown) => {
-        this.errorMessage.set(parseApiError(error).message);
+            error: (error: unknown) => {
+        const apiError = parseApiError(error);
+
+        // At login a 403 does not mean "missing permission": the password was right, but the
+        // user or their organization has been deactivated.
+        this.errorMessage.set(
+          apiError.status === 403
+            ? 'This account or its organization has been deactivated. Contact your administrator.'
+            : apiError.message,
+        );
         this.submitting.set(false);
       },
     });
