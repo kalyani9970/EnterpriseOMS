@@ -28,4 +28,8 @@ export const Permissions = {
     Create: 'warehouses.create',
     Update: 'warehouses.update',
   },
+  Inventory: {
+    View: 'inventory.view',
+    Adjust: 'inventory.adjust',
+  },
 } as const;

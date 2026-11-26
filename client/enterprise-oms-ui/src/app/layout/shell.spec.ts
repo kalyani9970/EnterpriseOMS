@@ -66,9 +66,14 @@ describe('Shell', () => {
     expect(navLinks(await render())).toEqual(['Home', 'Warehouses']);
   });
 
-    it('keeps the links in a fixed order: Home, Products, Warehouses, Organization, Roles', async () => {
-    signIn(['roles.view', 'organizations.view', 'warehouses.view', 'products.view']);
-    expect(navLinks(await render())).toEqual(['Home', 'Products', 'Warehouses', 'Organization', 'Roles']);
+    it('shows the Inventory link only to users who hold inventory.view', async () => {
+    signIn(['inventory.view']);
+    expect(navLinks(await render())).toEqual(['Home', 'Inventory']);
+  });
+
+      it('keeps the links in a fixed order: Home, Products, Warehouses, Inventory, Organization, Roles', async () => {
+    signIn(['roles.view', 'organizations.view', 'inventory.view', 'warehouses.view', 'products.view']);
+    expect(navLinks(await render())).toEqual(['Home', 'Products', 'Warehouses', 'Inventory', 'Organization', 'Roles']);
   });
   
     it('shows the Organization link only to users who hold organizations.view', async () => {

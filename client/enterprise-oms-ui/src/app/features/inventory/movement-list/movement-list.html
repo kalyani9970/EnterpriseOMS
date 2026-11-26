@@ -1,0 +1,174 @@
+<section>
+  <div>
+    <h1 class="text-2xl font-semibold text-slate-900">Inventory</h1>
+    <p class="mt-1 text-sm text-slate-500">Every change to stock, newest first. The ledger is never edited: a mistake is corrected with a new count.</p>
+  </div>
+
+  <nav class="mt-4 flex gap-6 border-b border-slate-200 text-sm" aria-label="Inventory sections">
+    <a
+      routerLink="/inventory"
+      routerLinkActive="border-indigo-600 text-slate-900"
+      [routerLinkActiveOptions]="{ exact: true }"
+      class="-mb-px border-b-2 border-transparent pb-2 text-slate-500 hover:text-slate-700"
+    >
+      Stock
+    </a>
+    <a
+      routerLink="/inventory/movements"
+      routerLinkActive="border-indigo-600 text-slate-900"
+      class="-mb-px border-b-2 border-transparent pb-2 text-slate-500 hover:text-slate-700"
+    >
+      Ledger
+    </a>
+  </nav>
+
+  <!-- Filters -->
+  <div class="mt-6 grid gap-3 rounded-xl bg-white p-4 ring-1 ring-slate-200 sm:grid-cols-3">
+    <div>
+      <label for="kind" class="block text-xs font-medium text-slate-600">Kind of movement</label>
+      <select
+        id="kind"
+        (change)="onKindChange($event)"
+        class="mt-1 block w-full rounded-lg border-0 px-3 py-2 text-sm text-slate-900 ring-1 ring-slate-300 focus:ring-2 focus:ring-indigo-600 focus:outline-none"
+      >
+        <option value="" [selected]="type() === null">All kinds</option>
+        @for (kind of kinds; track kind) {
+          <option [value]="kind" [selected]="type() === kind">{{ kindLabels[kind] }}</option>
+        }
+      </select>
+    </div>
+
+    @if (warehouses().length > 0) {
+      <div>
+        <label for="warehouseFilter" class="block text-xs font-medium text-slate-600">Warehouse</label>
+        <select
+          id="warehouseFilter"
+          (change)="onWarehouseChange($event)"
+          class="mt-1 block w-full rounded-lg border-0 px-3 py-2 text-sm text-slate-900 ring-1 ring-slate-300 focus:ring-2 focus:ring-indigo-600 focus:outline-none"
+        >
+          <option value="" [selected]="warehouseId() === null">All warehouses</option>
+          @for (option of warehouses(); track option.id) {
+            <option [value]="option.id" [selected]="warehouseId() === option.id">{{ option.code }} · {{ option.name }}</option>
+          }
+        </select>
+      </div>
+    }
+
+    @if (productLabel(); as label) {
+      <div class="flex items-end">
+        <p class="flex items-center gap-2 rounded-lg bg-indigo-50 px-3 py-2 text-sm text-indigo-800">
+          <span>Product: <strong>{{ label }}</strong></span>
+          <button type="button" (click)="clearProduct()" aria-label="Show all products" class="text-indigo-600 hover:text-indigo-500">✕</button>
+        </p>
+      </div>
+    }
+  </div>
+
+  <div class="mt-4">
+    @if (loadStatus() === 'error') {
+      <div role="alert" class="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-200">
+        <p>{{ loadError() }}</p>
+        <button type="button" (click)="retry()" class="mt-2 font-medium underline">Try again</button>
+      </div>
+    } @else if (page(); as current) {
+      <div class="overflow-x-auto rounded-xl bg-white ring-1 ring-slate-200" [class.opacity-60]="loadStatus() === 'loading'">
+        <table class="min-w-full divide-y divide-slate-200 text-sm">
+          <thead class="bg-slate-50 text-left text-xs font-medium tracking-wide text-slate-500 uppercase">
+            <tr>
+              <th scope="col" class="px-4 py-3">When</th>
+              <th scope="col" class="px-4 py-3">Product</th>
+              <th scope="col" class="px-4 py-3">Warehouse</th>
+              <th scope="col" class="px-4 py-3">Kind</th>
+              <th scope="col" class="px-4 py-3 text-right">Change</th>
+              <th scope="col" class="px-4 py-3 text-right">Balance</th>
+              <th scope="col" class="px-4 py-3">Reference / notes</th>
+              <th scope="col" class="px-4 py-3">By</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            @for (movement of current.items; track movement.id) {
+              <tr>
+                <td class="px-4 py-3 whitespace-nowrap text-slate-600">{{ when(movement) | date: 'medium' }}</td>
+                <td class="px-4 py-3">
+                  <span class="font-mono text-xs text-slate-600">{{ movement.productSku }}</span>
+                  <span class="ml-1 text-slate-900">{{ movement.productName }}</span>
+                </td>
+                <td class="px-4 py-3 font-mono text-xs text-slate-600">{{ movement.warehouseCode }}</td>
+                <td class="px-4 py-3 text-slate-700">{{ kindLabels[movement.type] }}</td>
+                <td
+                  class="px-4 py-3 text-right font-medium"
+                  [class]="movement.quantityChange > 0 ? 'text-green-700' : 'text-red-700'"
+                >
+                  {{ change(movement) }}
+                </td>
+                <td class="px-4 py-3 text-right text-slate-900">{{ movement.quantityAfter }}</td>
+                <td class="px-4 py-3 text-slate-600">
+                  @if (movement.reference) {
+                    <span class="font-medium text-slate-800">{{ movement.reference }}</span>
+                  }
+                  @if (movement.notes) {
+                    <span class="block text-xs text-slate-500">{{ movement.notes }}</span>
+                  }
+                </td>
+                <td class="px-4 py-3 text-xs text-slate-500">{{ movement.createdBy ? 'User #' + movement.createdBy : '—' }}</td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="8" class="px-4 py-10 text-center text-sm text-slate-500">
+                  @if (hasActiveFilters()) {
+                    No movements match these filters.
+                  } @else {
+                    No stock movements yet.
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <div class="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-slate-600">
+        <p>
+          @if (current.totalCount > 0) {
+            Showing {{ rangeStart() }}–{{ rangeEnd() }} of {{ current.totalCount }}
+          } @else {
+            0 movements
+          }
+        </p>
+
+        <div class="flex items-center gap-3">
+          <label for="pageSize" class="text-xs text-slate-500">Per page</label>
+          <select
+            id="pageSize"
+            (change)="onPageSizeChange($event)"
+            class="rounded-lg border-0 px-2 py-1.5 text-sm ring-1 ring-slate-300 focus:ring-2 focus:ring-indigo-600 focus:outline-none"
+          >
+            @for (size of pageSizes; track size) {
+              <option [value]="size" [selected]="pageSize() === size">{{ size }}</option>
+            }
+          </select>
+
+          <button
+            type="button"
+            (click)="goToPage(current.pageNumber - 1)"
+            [disabled]="!current.hasPreviousPage"
+            class="rounded-lg px-3 py-1.5 ring-1 ring-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Previous
+          </button>
+          <span>Page {{ current.pageNumber }} of {{ current.totalPages || 1 }}</span>
+          <button
+            type="button"
+            (click)="goToPage(current.pageNumber + 1)"
+            [disabled]="!current.hasNextPage"
+            class="rounded-lg px-3 py-1.5 ring-1 ring-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+    } @else {
+      <p class="text-sm text-slate-500" role="status">Loading the ledger…</p>
+    }
+  </div>
+</section>

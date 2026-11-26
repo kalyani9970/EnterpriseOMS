@@ -1,0 +1,234 @@
+<form
+  [formGroup]="form"
+  (ngSubmit)="save()"
+  novalidate
+  class="rounded-xl bg-white p-6 ring-1 ring-slate-200"
+  [attr.aria-label]="title()"
+>
+  <div class="flex items-start justify-between gap-4">
+    <div>
+      <h2 class="text-base font-semibold text-slate-900">{{ title() }}</h2>
+
+      @if (effectiveProduct(); as product) {
+        <p class="mt-1 text-sm text-slate-600">
+          <span class="font-mono">{{ product.sku }}</span> · {{ product.name }}
+          @if (effectiveWarehouse(); as warehouse) {
+            in <span class="font-mono">{{ warehouse.code }}</span>
+          }
+        </p>
+      }
+
+      @if (currentQuantity() !== null) {
+        <p class="mt-1 text-sm text-slate-500">
+          {{ mode() === 'adjust' ? 'The system says' : 'On hand now:' }} <strong class="text-slate-700">{{ currentQuantity() }}</strong>
+        </p>
+      }
+    </div>
+  </div>
+
+  @if (conflictNotice()) {
+    <div role="alert" class="mt-4 rounded-lg bg-amber-50 px-4 py-3 text-sm text-amber-800 ring-1 ring-amber-200">
+      <p class="font-medium">Someone else changed this stock at the same moment.</p>
+      <p class="mt-1">
+        @if (mode() === 'adjust') {
+          Check the number now shown above, count again, and record it. Your count was not saved.
+        } @else {
+          The number above has been refreshed. Nothing was recorded, so please try again.
+        }
+      </p>
+    </div>
+  } @else if (errorMessage(); as message) {
+    <div role="alert" class="mt-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-200">
+      {{ message }}
+    </div>
+  }
+
+  @if (pickerError(); as message) {
+    <p role="alert" class="mt-4 text-sm text-red-600">{{ message }}</p>
+  }
+
+  <!-- Choosing a product and a warehouse (only when the form was not opened from a stock row) -->
+  @if (needsProductPicker()) {
+    <div class="mt-4">
+      <label for="product-search" class="block text-sm font-medium text-slate-700">Product</label>
+
+      @if (pickedProduct(); as picked) {
+        <p class="mt-1 text-sm text-slate-900">
+          <span class="font-mono">{{ picked.sku }}</span> · {{ picked.name }}
+          <button type="button" (click)="changeProduct()" class="ml-2 text-indigo-600 hover:text-indigo-500">Change</button>
+        </p>
+      } @else {
+        <input
+          id="product-search"
+          type="search"
+          placeholder="Search by SKU or name"
+          autocomplete="off"
+          (input)="onProductSearch($event)"
+          class="mt-1 block w-full rounded-lg border-0 px-3 py-2 text-sm text-slate-900 ring-1 ring-slate-300 focus:ring-2 focus:ring-indigo-600 focus:outline-none"
+        />
+
+        @if (productResults().length > 0) {
+          <ul class="mt-2 divide-y divide-slate-100 rounded-lg ring-1 ring-slate-200" aria-label="Matching products">
+            @for (result of productResults(); track result.id) {
+              <li>
+                <button
+                  type="button"
+                  (click)="pickProduct(result)"
+                  class="flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-slate-50"
+                >
+                  <span class="font-mono text-xs text-slate-600">{{ result.sku }}</span>
+                  <span class="text-slate-900">{{ result.name }}</span>
+                </button>
+              </li>
+            }
+          </ul>
+        }
+      }
+    </div>
+  }
+
+  @if (needsWarehousePicker()) {
+    <div class="mt-4">
+      <label for="warehouse" class="block text-sm font-medium text-slate-700">Warehouse</label>
+      <select
+        id="warehouse"
+        (change)="onWarehouseChange($event)"
+        class="mt-1 block w-full rounded-lg border-0 px-3 py-2 text-sm text-slate-900 ring-1 ring-slate-300 focus:ring-2 focus:ring-indigo-600 focus:outline-none"
+      >
+        <option value="">Choose a warehouse</option>
+        @for (option of warehouseOptions(); track option.id) {
+          <option [value]="option.id">{{ option.code }} · {{ option.name }}</option>
+        }
+      </select>
+    </div>
+  }
+
+  <div class="mt-4 space-y-4">
+    @if (mode() === 'adjust') {
+      <div>
+        <label for="countedQuantity" class="block text-sm font-medium text-slate-700">Counted quantity</label>
+        <input
+          id="countedQuantity"
+          type="number"
+          step="1"
+          min="0"
+          formControlName="countedQuantity"
+          class="mt-1 block w-full rounded-lg border-0 px-3 py-2 text-sm text-slate-900 ring-1 ring-slate-300 focus:ring-2 focus:ring-indigo-600 focus:outline-none"
+          [attr.aria-invalid]="showError(form.controls.countedQuantity)"
+        />
+        <p class="mt-1 text-xs text-slate-500">What you actually counted. The difference is recorded as an adjustment.</p>
+        @if (showError(form.controls.countedQuantity)) {
+          <p class="mt-1 text-sm text-red-600">
+            @if (form.controls.countedQuantity.hasError('required')) {
+              The counted quantity is required.
+            } @else if (form.controls.countedQuantity.hasError('wholeNumber')) {
+              The counted quantity must be a whole number.
+            } @else {
+              The counted quantity must be between 0 and 1,000,000,000.
+            }
+          </p>
+        }
+        @if (serverError('countedQuantity'); as message) {
+          <p class="mt-1 text-sm text-red-600">{{ message }}</p>
+        }
+      </div>
+
+      <div>
+        <label for="reason" class="block text-sm font-medium text-slate-700">Reason</label>
+        <textarea
+          id="reason"
+          rows="2"
+          formControlName="reason"
+          class="mt-1 block w-full rounded-lg border-0 px-3 py-2 text-sm text-slate-900 ring-1 ring-slate-300 focus:ring-2 focus:ring-indigo-600 focus:outline-none"
+          [attr.aria-invalid]="showError(form.controls.reason)"
+        ></textarea>
+        @if (showError(form.controls.reason)) {
+          <p class="mt-1 text-sm text-red-600">
+            @if (form.controls.reason.hasError('required') || form.controls.reason.hasError('pattern')) {
+              A reason is required for a stock count.
+            } @else {
+              The reason must be {{ limits.notesMaxLength }} characters or fewer.
+            }
+          </p>
+        }
+        @if (serverError('reason'); as message) {
+          <p class="mt-1 text-sm text-red-600">{{ message }}</p>
+        }
+      </div>
+    } @else {
+      <div>
+        <label for="quantity" class="block text-sm font-medium text-slate-700">Quantity</label>
+        <input
+          id="quantity"
+          type="number"
+          step="1"
+          min="1"
+          formControlName="quantity"
+          class="mt-1 block w-full rounded-lg border-0 px-3 py-2 text-sm text-slate-900 ring-1 ring-slate-300 focus:ring-2 focus:ring-indigo-600 focus:outline-none"
+          [attr.aria-invalid]="showError(form.controls.quantity)"
+        />
+        @if (exceedsStockOnHand()) {
+          <p class="mt-1 text-sm text-red-600">Only {{ currentQuantity() }} on hand.</p>
+        }
+        @if (showError(form.controls.quantity)) {
+          <p class="mt-1 text-sm text-red-600">
+            @if (form.controls.quantity.hasError('required')) {
+              Quantity is required.
+            } @else if (form.controls.quantity.hasError('wholeNumber')) {
+              Quantity must be a whole number.
+            } @else {
+              Quantity must be between 1 and 1,000,000,000.
+            }
+          </p>
+        }
+        @if (serverError('quantity'); as message) {
+          <p class="mt-1 text-sm text-red-600">{{ message }}</p>
+        }
+      </div>
+
+      <div>
+        <label for="reference" class="block text-sm font-medium text-slate-700">
+          Reference <span class="font-normal text-slate-400">(optional)</span>
+        </label>
+        <input
+          id="reference"
+          type="text"
+          formControlName="reference"
+          [placeholder]="mode() === 'receive' ? 'Purchase order or delivery note' : 'Sales order or note number'"
+          class="mt-1 block w-full rounded-lg border-0 px-3 py-2 text-sm text-slate-900 ring-1 ring-slate-300 focus:ring-2 focus:ring-indigo-600 focus:outline-none"
+          [attr.aria-invalid]="showError(form.controls.reference)"
+        />
+        @if (showError(form.controls.reference)) {
+          <p class="mt-1 text-sm text-red-600">Reference must be {{ limits.referenceMaxLength }} characters or fewer.</p>
+        }
+      </div>
+
+      <div>
+        <label for="notes" class="block text-sm font-medium text-slate-700">
+          Notes <span class="font-normal text-slate-400">(optional)</span>
+        </label>
+        <textarea
+          id="notes"
+          rows="2"
+          formControlName="notes"
+          class="mt-1 block w-full rounded-lg border-0 px-3 py-2 text-sm text-slate-900 ring-1 ring-slate-300 focus:ring-2 focus:ring-indigo-600 focus:outline-none"
+          [attr.aria-invalid]="showError(form.controls.notes)"
+        ></textarea>
+        @if (showError(form.controls.notes)) {
+          <p class="mt-1 text-sm text-red-600">Notes must be {{ limits.notesMaxLength }} characters or fewer.</p>
+        }
+      </div>
+    }
+  </div>
+
+  <div class="mt-5 flex items-center gap-3">
+    <button
+      type="submit"
+      [disabled]="saving()"
+      class="rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 focus:outline-none disabled:cursor-not-allowed disabled:opacity-60"
+    >
+      {{ saving() ? 'Saving…' : submitLabel() }}
+    </button>
+    <button type="button" (click)="cancelled.emit()" class="text-sm text-slate-500 hover:text-slate-700">Cancel</button>
+  </div>
+</form>

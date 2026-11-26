@@ -18,6 +18,7 @@ namespace EnterpriseOMS.Application.IntegrationTests.Persistence
     {
         private async Task SeedAsync()
         {
+            ActAnonymously();
             using var scope = App.Services.CreateScope();
             await scope.ServiceProvider.GetRequiredService<WarehouseDemoSeeder>().SeedAsync();
         }

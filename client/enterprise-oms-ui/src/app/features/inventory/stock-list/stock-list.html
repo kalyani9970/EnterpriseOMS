@@ -1,0 +1,257 @@
+<section>
+  <div class="flex items-start justify-between gap-4">
+    <div>
+      <h1 class="text-2xl font-semibold text-slate-900">Inventory</h1>
+      <p class="mt-1 text-sm text-slate-500">How much of each product is in each warehouse.</p>
+    </div>
+
+    @if (canAdjust()) {
+      <button
+        type="button"
+        (click)="openForm('receive')"
+        class="rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-500 focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 focus:outline-none"
+      >
+        Receive stock
+      </button>
+    }
+  </div>
+
+  <nav class="mt-4 flex gap-6 border-b border-slate-200 text-sm" aria-label="Inventory sections">
+    <a
+      routerLink="/inventory"
+      routerLinkActive="border-indigo-600 text-slate-900"
+      [routerLinkActiveOptions]="{ exact: true }"
+      class="-mb-px border-b-2 border-transparent pb-2 text-slate-500 hover:text-slate-700"
+    >
+      Stock
+    </a>
+    <a
+      routerLink="/inventory/movements"
+      routerLinkActive="border-indigo-600 text-slate-900"
+      class="-mb-px border-b-2 border-transparent pb-2 text-slate-500 hover:text-slate-700"
+    >
+      Ledger
+    </a>
+  </nav>
+
+  <!-- Filters -->
+  <div class="mt-6 grid gap-3 rounded-xl bg-white p-4 ring-1 ring-slate-200 sm:grid-cols-3">
+    <div>
+      <label for="search" class="block text-xs font-medium text-slate-600">Search</label>
+      <input
+        id="search"
+        type="search"
+        placeholder="SKU or product name"
+        [value]="search()"
+        (input)="onSearchInput($event)"
+        class="mt-1 block w-full rounded-lg border-0 px-3 py-2 text-sm text-slate-900 ring-1 ring-slate-300 focus:ring-2 focus:ring-indigo-600 focus:outline-none"
+      />
+    </div>
+
+    @if (warehouses().length > 0) {
+      <div>
+        <label for="warehouseFilter" class="block text-xs font-medium text-slate-600">Warehouse</label>
+        <select
+          id="warehouseFilter"
+          (change)="onWarehouseChange($event)"
+          class="mt-1 block w-full rounded-lg border-0 px-3 py-2 text-sm text-slate-900 ring-1 ring-slate-300 focus:ring-2 focus:ring-indigo-600 focus:outline-none"
+        >
+          <option value="" [selected]="warehouseId() === null">All warehouses</option>
+          @for (option of warehouses(); track option.id) {
+            <option [value]="option.id" [selected]="warehouseId() === option.id">{{ option.code }} · {{ option.name }}</option>
+          }
+        </select>
+      </div>
+    }
+
+    <div class="flex items-end">
+      <label class="flex items-center gap-2 text-sm text-slate-700">
+        <input
+          id="lowStock"
+          type="checkbox"
+          [checked]="lowStockOnly()"
+          (change)="onLowStockChange($event)"
+          class="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-600"
+        />
+        Low stock only
+      </label>
+    </div>
+  </div>
+
+  @if (notice(); as message) {
+    <div role="status" class="mt-4 rounded-lg bg-green-50 px-4 py-3 text-sm text-green-700 ring-1 ring-green-200">
+      {{ message }}
+    </div>
+  }
+
+  @for (current of panels(); track current.key) {
+    <div class="mt-4">
+      <app-stock-movement-form
+        [mode]="current.mode"
+        [product]="current.product"
+        [warehouse]="current.warehouse"
+        [currentQuantity]="panelQuantity()"
+        (saved)="onSaved($event)"
+        (cancelled)="closeForm()"
+        (conflict)="onConflict()"
+      />
+    </div>
+  }
+
+  <div class="mt-4">
+    @if (loadStatus() === 'error') {
+      <div role="alert" class="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700 ring-1 ring-red-200">
+        <p>{{ loadError() }}</p>
+        <button type="button" (click)="retry()" class="mt-2 font-medium underline">Try again</button>
+      </div>
+    } @else if (page(); as current) {
+      <div class="overflow-x-auto rounded-xl bg-white ring-1 ring-slate-200" [class.opacity-60]="loadStatus() === 'loading'">
+        <table class="min-w-full divide-y divide-slate-200 text-sm">
+          <thead class="bg-slate-50 text-left text-xs font-medium tracking-wide text-slate-500 uppercase">
+            <tr>
+              <th scope="col" class="px-4 py-3" [attr.aria-sort]="ariaSort('sku')">
+                <button type="button" (click)="sortByField('sku')" class="font-medium uppercase">SKU {{ sortIndicator('sku') }}</button>
+              </th>
+              <th scope="col" class="px-4 py-3" [attr.aria-sort]="ariaSort('name')">
+                <button type="button" (click)="sortByField('name')" class="font-medium uppercase">Product {{ sortIndicator('name') }}</button>
+              </th>
+              <th scope="col" class="px-4 py-3" [attr.aria-sort]="ariaSort('warehouse')">
+                <button type="button" (click)="sortByField('warehouse')" class="font-medium uppercase">
+                  Warehouse {{ sortIndicator('warehouse') }}
+                </button>
+              </th>
+              <th scope="col" class="px-4 py-3 text-right" [attr.aria-sort]="ariaSort('quantity')">
+                <button type="button" (click)="sortByField('quantity')" class="font-medium uppercase">
+                  On hand {{ sortIndicator('quantity') }}
+                </button>
+              </th>
+              <th scope="col" class="px-4 py-3 text-right">Reorder at</th>
+              <th scope="col" class="px-4 py-3">Status</th>
+              <th scope="col" class="px-4 py-3"><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-100">
+            @for (item of current.items; track item.productId + '-' + item.warehouseId) {
+              <tr>
+                <td class="px-4 py-3 font-mono text-xs text-slate-700">{{ item.productSku }}</td>
+                <td class="px-4 py-3 font-medium text-slate-900">{{ item.productName }}</td>
+                <td class="px-4 py-3 font-mono text-xs text-slate-600">{{ item.warehouseCode }}</td>
+                <td class="px-4 py-3 text-right text-slate-900">
+                  {{ item.quantityOnHand }} <span class="text-xs text-slate-400">{{ item.unitOfMeasure }}</span>
+                </td>
+                <td class="px-4 py-3 text-right text-slate-600">{{ item.reorderLevel }}</td>
+                <td class="px-4 py-3">
+                  @switch (statusOf(item)) {
+                    @case ('out') {
+                      <span class="rounded-full bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700">Out of stock</span>
+                    }
+                    @case ('low') {
+                      <span class="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">Low</span>
+                    }
+                    @default {
+                      <span class="rounded-full bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700">OK</span>
+                    }
+                  }
+                </td>
+                <td class="px-4 py-3 text-right whitespace-nowrap">
+                  <a
+                    routerLink="/inventory/movements"
+                    [queryParams]="{ productId: item.productId, warehouseId: item.warehouseId }"
+                    [attr.aria-label]="'History of ' + item.productSku + ' in ' + item.warehouseCode"
+                    class="mr-3 text-slate-600 hover:text-slate-900"
+                  >
+                    History
+                  </a>
+                  @if (canAdjust()) {
+                    <button
+                      type="button"
+                      (click)="openForm('receive', item)"
+                      [attr.aria-label]="'Receive ' + item.productSku + ' into ' + item.warehouseCode"
+                      class="mr-3 text-indigo-600 hover:text-indigo-500"
+                    >
+                      Receive
+                    </button>
+                    <button
+                      type="button"
+                      (click)="openForm('issue', item)"
+                      [disabled]="item.quantityOnHand === 0"
+                      [attr.title]="item.quantityOnHand === 0 ? 'Nothing on hand to issue' : null"
+                      [attr.aria-label]="'Issue ' + item.productSku + ' from ' + item.warehouseCode"
+                      class="mr-3 text-indigo-600 hover:text-indigo-500 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      Issue
+                    </button>
+                    <button
+                      type="button"
+                      (click)="openForm('adjust', item)"
+                      [attr.aria-label]="'Count ' + item.productSku + ' in ' + item.warehouseCode"
+                      class="text-indigo-600 hover:text-indigo-500"
+                    >
+                      Count
+                    </button>
+                  }
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="7" class="px-4 py-10 text-center text-sm text-slate-500">
+                  @if (hasActiveFilters()) {
+                    No stock matches your search or filters.
+                  } @else {
+                    No stock recorded yet.
+                    @if (canAdjust()) {
+                      Use <strong>Receive stock</strong> to book in the first delivery.
+                    }
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+
+      <div class="mt-4 flex flex-wrap items-center justify-between gap-3 text-sm text-slate-600">
+        <p>
+          @if (current.totalCount > 0) {
+            Showing {{ rangeStart() }}–{{ rangeEnd() }} of {{ current.totalCount }}
+          } @else {
+            0 stock levels
+          }
+        </p>
+
+        <div class="flex items-center gap-3">
+          <label for="pageSize" class="text-xs text-slate-500">Per page</label>
+          <select
+            id="pageSize"
+            (change)="onPageSizeChange($event)"
+            class="rounded-lg border-0 px-2 py-1.5 text-sm ring-1 ring-slate-300 focus:ring-2 focus:ring-indigo-600 focus:outline-none"
+          >
+            @for (size of pageSizes; track size) {
+              <option [value]="size" [selected]="pageSize() === size">{{ size }}</option>
+            }
+          </select>
+
+          <button
+            type="button"
+            (click)="goToPage(current.pageNumber - 1)"
+            [disabled]="!current.hasPreviousPage"
+            class="rounded-lg px-3 py-1.5 ring-1 ring-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Previous
+          </button>
+          <span>Page {{ current.pageNumber }} of {{ current.totalPages || 1 }}</span>
+          <button
+            type="button"
+            (click)="goToPage(current.pageNumber + 1)"
+            [disabled]="!current.hasNextPage"
+            class="rounded-lg px-3 py-1.5 ring-1 ring-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            Next
+          </button>
+        </div>
+      </div>
+    } @else {
+      <p class="text-sm text-slate-500" role="status">Loading stock…</p>
+    }
+  </div>
+</section>

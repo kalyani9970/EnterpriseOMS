@@ -13,6 +13,7 @@ public class ProductDemoSeederTests : IntegrationTestBase
 {
     private async Task SeedAsync()
     {
+        ActAnonymously();
         using var scope = App.Services.CreateScope();
         await scope.ServiceProvider.GetRequiredService<ProductDemoSeeder>().SeedAsync();
     }

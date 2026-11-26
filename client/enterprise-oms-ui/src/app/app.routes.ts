@@ -74,6 +74,19 @@ export const routes: Routes = [
           import('./features/warehouses/warehouse-form/warehouse-form').then((m) => m.WarehouseForm),
       },
       {
+        path: 'inventory',
+        title: 'Inventory',
+        canActivate: [requirePermission(Permissions.Inventory.View)],
+        loadComponent: () => import('./features/inventory/stock-list/stock-list').then((m) => m.StockList),
+      },
+      {
+        path: 'inventory/movements',
+        title: 'Stock ledger',
+        canActivate: [requirePermission(Permissions.Inventory.View)],
+        loadComponent: () =>
+          import('./features/inventory/movement-list/movement-list').then((m) => m.MovementList),
+      },
+      {
         path: 'organization',
         title: 'Organization',
         canActivate: [requirePermission(Permissions.Organizations.View)],
